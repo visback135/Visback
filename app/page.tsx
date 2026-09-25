@@ -378,14 +378,14 @@ export default function VisbackDashboard() {
               type="email" 
               placeholder="Correo" 
               ref={loginEmailRef}
-              defaultValue="cliente@visback.com"
+              defaultValue=""
               className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-purple-500" 
             />
             <input 
               type="password" 
               placeholder="Contraseña" 
               ref={loginPasswordRef}
-              defaultValue="123456"
+              defaultValue=""
               className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-purple-500" 
             />
             <button 
