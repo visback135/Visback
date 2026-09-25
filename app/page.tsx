@@ -54,8 +54,6 @@ interface Usuario {
   saldo: number;
 }
 
-const GOOGLE_SHEET_URL = "https://script.google.com/macros/s/AKfycbxDn4pw8o5OZycQVJTGjXhuuyIEjKiNhoPaxwJXIAF5JxYHu4GcIWV04H-rhH3ktQJhCw/exec";
-
 export default function VisbackDashboard() {
   const [viewMode, setViewMode] = useState<'login' | 'register' | 'app'>('login');
   
@@ -71,34 +69,18 @@ export default function VisbackDashboard() {
   const [adminNuevoPass, setAdminNuevoPass] = useState('');
   const [adminNuevoEstado, setAdminNuevoEstado] = useState<'activo' | 'pendiente'>('activo');
 
-  const [usuariosRegistrados, setUsuariosRegistrados] = useState<Usuario[]>([
-    { email: 'admin@visback.com', pass: 'admin123', nombre: 'Administrador', rol: 'admin', estado: 'activo', saldo: 500.00 },
-    { email: 'cliente@visback.com', pass: '123456', nombre: 'Brandon Beltran', rol: 'cliente', estado: 'activo', saldo: 125.00 }
-  ]);
-
-  // Sincronizar usuarios desde Google Sheets al cargar
-  useEffect(() => {
-    fetch(GOOGLE_SHEET_URL)
-      .then(res => res.json())
-      .then(data => {
-        if (Array.isArray(data) && data.length > 0) {
-          const formateados: Usuario[] = data.map((u: any) => ({
-            email: u.email || '',
-            pass: u.pass || '',
-            nombre: u.nombre || '',
-            rol: (u.rol === 'admin' ? 'admin' : 'cliente'),
-            estado: (u.estado === 'pendiente' ? 'pendiente' : 'activo'),
-            saldo: Number(u.saldo) || 0
-          }));
-          // Asegurar que el admin principal siempre esté presente
-          if (!formateados.some(u => u.email === 'admin@visback.com')) {
-            formateados.unshift({ email: 'admin@visback.com', pass: 'admin123', nombre: 'Administrador', rol: 'admin', estado: 'activo', saldo: 500.00 });
-          }
-          setUsuariosRegistrados(formateados);
-        }
-      })
-      .catch(err => console.error("Error al cargar de Google Sheets:", err));
-  }, []);
+  const [usuariosRegistrados, setUsuariosRegistrados] = useState<Usuario[]>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('visback_usuarios');
+      if (saved) {
+        try { return JSON.parse(saved); } catch (e) { console.error(e); }
+      }
+    }
+    return [
+      { email: 'admin@visback.com', pass: 'admin123', nombre: 'Administrador', rol: 'admin', estado: 'activo', saldo: 500.00 },
+      { email: 'cliente@visback.com', pass: '123456', nombre: 'Brandon Beltran', rol: 'cliente', estado: 'activo', saldo: 125.00 }
+    ];
+  });
 
   const [productos, setProductos] = useState<Producto[]>(() => {
     if (typeof window !== 'undefined') {
@@ -140,6 +122,12 @@ export default function VisbackDashboard() {
       { id: '#002004', producto: 'ViX Premium 1M', correo: 'vixprem1@gmail.com', pass: 'vix2026', pin: '1234', precio: 10.00, vencimiento: '24/10/2026', estado: 'Activa' },
     ];
   });
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('visback_usuarios', JSON.stringify(usuariosRegistrados));
+    }
+  }, [usuariosRegistrados]);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -201,7 +189,7 @@ export default function VisbackDashboard() {
     setActiveTab(encontrado.rol === 'admin' ? 'admin' : 'inicio');
   };
 
-  const handleRegister = async (e: React.FormEvent) => {
+  const handleRegister = (e: React.FormEvent) => {
     e.preventDefault();
     if (!regNombre || !regEmail || !regPassword) {
       alert("Completa todos los campos.");
@@ -219,19 +207,7 @@ export default function VisbackDashboard() {
       estado: 'activo',
       saldo: 0.00
     };
-    
     setUsuariosRegistrados(prev => [...prev, nuevo]);
-
-    try {
-      await fetch(GOOGLE_SHEET_URL, {
-        method: 'POST',
-        mode: 'no-cors',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'register', ...nuevo })
-      });
-    } catch (err) {
-      console.error("Error al sincronizar con Sheets:", err);
-    }
 
     const mensaje = encodeURIComponent(`Hola Visback Stream, me acabo de registrar. \n\nNombre: ${regNombre}\nCorreo: ${regEmail}\nContraseña: ${regPassword}\n\nSolicito la activación de mi cuenta.`);
     window.open(`https://wa.me/${whatsappNumber}?text=${mensaje}`, '_blank');
@@ -242,7 +218,7 @@ export default function VisbackDashboard() {
     setViewMode('login');
   };
 
-  const agregarClienteAdmin = async (e: React.FormEvent) => {
+  const agregarClienteAdmin = (e: React.FormEvent) => {
     e.preventDefault();
     if (!adminNuevoNombre || !adminNuevoEmail || !adminNuevoPass) {
       alert("Por favor completa el nombre, correo y contraseña del cliente.");
@@ -263,43 +239,20 @@ export default function VisbackDashboard() {
     };
 
     setUsuariosRegistrados(prev => [...prev, nuevoCliente]);
-
-    try {
-      await fetch(GOOGLE_SHEET_URL, {
-        method: 'POST',
-        mode: 'no-cors',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'add', ...nuevoCliente })
-      });
-    } catch (err) {
-      console.error("Error al sincronizar con Sheets:", err);
-    }
-
     setAdminNuevoNombre('');
     setAdminNuevoEmail('');
     setAdminNuevoPass('');
     setAdminNuevoEstado('activo');
-    alert(`¡Cliente ${nuevoCliente.nombre} creado y guardado en Google Sheets con éxito!`);
+    alert(`¡Cliente ${nuevoCliente.nombre} creado con éxito!`);
   };
 
-  const eliminarUsuario = async (email: string) => {
+  const eliminarUsuario = (email: string) => {
     if (email === 'admin@visback.com') {
       alert("No se puede eliminar al administrador principal.");
       return;
     }
     if (confirm(`¿Estás seguro de eliminar al usuario ${email}?`)) {
       setUsuariosRegistrados(prev => prev.filter(u => u.email !== email));
-
-      try {
-        await fetch(GOOGLE_SHEET_URL, {
-          method: 'POST',
-          mode: 'no-cors',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'delete', email })
-        });
-      } catch (err) {
-        console.error("Error al eliminar en Sheets:", err);
-      }
     }
   };
 
@@ -475,7 +428,7 @@ export default function VisbackDashboard() {
           <div className="text-center space-y-2">
             <div className="w-14 h-14 bg-purple-600 rounded-2xl flex items-center justify-center font-bold text-2xl text-white mx-auto shadow-lg shadow-purple-600/30">V</div>
             <h1 className="text-2xl font-extrabold text-white">Visback Stream</h1>
-            <p className="text-slate-400 text-sm">Sincronizado con Google Sheets</p>
+            <p className="text-slate-400 text-sm">Inicia sesión con tu cuenta registrada</p>
           </div>
           <div className="space-y-4 relative z-20">
             <input 
@@ -520,7 +473,7 @@ export default function VisbackDashboard() {
         <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl space-y-6 my-auto mb-16">
           <div className="text-center space-y-2">
             <h1 className="text-2xl font-extrabold text-white">Registro de Cliente</h1>
-            <p className="text-slate-400 text-sm">Se guardará directo en Google Sheets y avísanos por WhatsApp</p>
+            <p className="text-slate-400 text-sm">Crea tu cuenta y avísanos por WhatsApp</p>
           </div>
           <form onSubmit={handleRegister} className="space-y-4">
             <input type="text" placeholder="Nombre completo" value={regNombre} onChange={e => setRegNombre(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-emerald-500" />
@@ -595,8 +548,8 @@ export default function VisbackDashboard() {
           {activeTab === 'admin' && usuarioActual?.rol === 'admin' && (
             <div className="space-y-6">
               <div className="bg-gradient-to-r from-amber-600 to-orange-700 rounded-3xl p-6 text-white shadow-xl">
-                <h3 className="text-2xl font-bold">Panel de Administración 🛡️ (Sincronizado con Sheets)</h3>
-                <p className="text-amber-100 text-sm mt-1">Controla clientes, saldos, credenciales y stock automático en la nube.</p>
+                <h3 className="text-2xl font-bold">Panel de Administración 🛡️</h3>
+                <p className="text-amber-100 text-sm mt-1">Controla clientes, saldos, credenciales unitarias, carga masiva y stock automático.</p>
               </div>
 
               {/* Agregar nuevo servicio */}
@@ -718,7 +671,7 @@ export default function VisbackDashboard() {
               {/* Agregar Cliente Manual */}
               <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
                 <h4 className="font-bold text-lg text-slate-800 flex items-center gap-2">
-                  <UserPlus size={20} className="text-amber-600" /> Agregar Nuevo Cliente (Sincroniza a Sheets)
+                  <UserPlus size={20} className="text-amber-600" /> Agregar Nuevo Cliente Manualmente
                 </h4>
                 <form onSubmit={agregarClienteAdmin} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                   <input type="text" placeholder="Nombre del cliente" value={adminNuevoNombre} onChange={e => setAdminNuevoNombre(e.target.value)} className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm" />
@@ -729,12 +682,12 @@ export default function VisbackDashboard() {
                     <option value="pendiente">Estado: Pendiente</option>
                   </select>
                   <button type="submit" className="sm:col-span-2 lg:col-span-4 bg-amber-600 hover:bg-amber-700 text-white font-bold py-3 rounded-xl text-sm cursor-pointer transition-all shadow-md shadow-amber-600/25">
-                    Crear Cuenta de Cliente en la Nube
+                    Crear Cuenta de Cliente
                   </button>
                 </form>
               </div>
 
-              {/* Clientes y Ajuste de Saldos */}
+              {/* Clientes y Ajuste de Saldos (CON BOTÓN DE ELIMINAR EN VEZ DE ACTIVAR/DESACTIVAR) */}
               <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
                 <h4 className="font-bold text-lg text-slate-800 flex items-center gap-2">
                   <Users size={20} className="text-amber-600" /> Clientes y Gestión de Saldo ({usuariosRegistrados.length})
@@ -941,7 +894,7 @@ export default function VisbackDashboard() {
             <p className="text-slate-600 text-sm">¿Deseas comprar <strong>{productoAConfirmar.nombre}</strong> por ${productoAConfirmar.precio.toFixed(2)} MXN?</p>
             <div className="flex gap-3 pt-2">
               <button onClick={() => setProductoAConfirmar(null)} className="flex-1 bg-slate-200 text-slate-700 font-bold py-2.5 rounded-xl text-sm cursor-pointer">No</button>
-              <button onClick={ejecutarCompraFinal} className="flex-1 bg-purple-600 text-white font-bold py.2.5 rounded-xl text-sm cursor-pointer">Sí</button>
+              <button onClick={ejecutarCompraFinal} className="flex-1 bg-purple-600 text-white font-bold py-2.5 rounded-xl text-sm cursor-pointer">Sí</button>
             </div>
           </div>
         </div>
