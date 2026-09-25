@@ -37,7 +37,7 @@ export default function Home() {
     }
   }, [vista]);
 
-  // Inicio de sesión
+  // Inicio de sesión BLINDADO (Revisa estatus activo)
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setMensaje('');
@@ -60,8 +60,9 @@ export default function Home() {
       return;
     }
 
-    if (data.estatus === 'pendiente') {
-      setMensaje('Tu cuenta está pendiente de activación por el administrador.');
+    // VALIDACIÓN: Si no está activo, se le bloquea la entrada
+    if (data.estatus !== 'activo') {
+      setMensaje('Tu cuenta está desactivada o pendiente de activación por el administrador.');
       return;
     }
 
@@ -69,7 +70,7 @@ export default function Home() {
     setVista('dashboard');
   };
 
-  // Registro de usuario
+  // Registro de usuario con depuración de errores exactos
   const handleRegistro = async (e: React.FormEvent) => {
     e.preventDefault();
     setMensaje('');
@@ -79,16 +80,19 @@ export default function Home() {
     ]);
 
     if (error) {
-      setMensaje('Error al registrarse. Es posible que el correo ya esté en uso.');
+      console.error('Error detallado de Supabase:', error);
+      alert('Error de Supabase: ' + error.message);
+      setMensaje('Error: ' + error.message);
     } else {
+      alert('¡Registrado con éxito en Supabase!');
       setMensaje('¡Registro exitoso! Tu cuenta está pendiente de activación.');
       setVista('login');
     }
   };
 
-  // Cambiar estatus de usuario (Activo / Pendiente)
+  // Cambiar estatus de usuario (Activo / Desactivado)
   const cambiarEstatus = async (id: string, estatusActual: string) => {
-    const nuevoEstatus = estatusActual === 'activo' ? 'pendiente' : 'activo';
+    const nuevoEstatus = estatusActual === 'activo' ? 'desactivado' : 'activo';
     const { error } = await supabase
       .from('usuarios')
       .update({ estatus: nuevoEstatus })
@@ -103,7 +107,7 @@ export default function Home() {
 
   // ELIMINAR USUARIO POR COMPLETO DE LA BASE DE DATOS
   const eliminarUsuario = async (id: string) => {
-    if (!confirm('¿Estás seguro de eliminar este usuario por completo?')) return;
+    if (!confirm('¿Estás seguro de eliminar este usuario por completo de la base de datos?')) return;
 
     const { error } = await supabase
       .from('usuarios')
