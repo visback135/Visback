@@ -120,7 +120,7 @@ export default function Home() {
 
   return (
     <main style={{ minHeight: '100vh', backgroundColor: '#0f172a', color: '#fff', padding: '20px', fontFamily: 'sans-serif' }}>
-      <div style={{ maxWidth: '600px', margin: '0 auto', background: '#1e293b', padding: '30px', borderRadius: '12px', boxShadow: '0 4px 15px rgba(0,0,0,0.3)' }}>
+      <div style={{ maxWidth: '800px', margin: '0 auto', background: '#1e293b', padding: '30px', borderRadius: '12px', boxShadow: '0 4px 15px rgba(0,0,0,0.3)' }}>
         
         <h1 style={{ textAlign: 'center', color: '#38bdf8', marginBottom: '20px' }}>Visback Stream</h1>
 
@@ -132,7 +132,7 @@ export default function Home() {
 
         {/* VISTA LOGIN */}
         {vista === 'login' && (
-          <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+          <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '15px', maxWidth: '400px', margin: '0 auto' }}>
             <h2>Iniciar Sesión</h2>
             <input 
               type="email" 
@@ -161,7 +161,7 @@ export default function Home() {
 
         {/* VISTA REGISTRO */}
         {vista === 'registro' && (
-          <form onSubmit={handleRegistro} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+          <form onSubmit={handleRegistro} style={{ display: 'flex', flexDirection: 'column', gap: '15px', maxWidth: '400px', margin: '0 auto' }}>
             <h2>Crear Cuenta</h2>
             <input 
               type="text" 
@@ -200,7 +200,7 @@ export default function Home() {
         {vista === 'dashboard' && usuarioActual && (
           <div>
             <h2>Bienvenido, {usuarioActual.nombre}</h2>
-            <p>Tu saldo disponible: <strong>${usuarioActual.saldo}</strong></p>
+            <p>Tu saldo disponible: <strong>${usuarioActual.saldo} MXN</strong></p>
             <p>Estatus de cuenta: <span style={{ color: '#22c55e' }}>{usuarioActual.estatus}</span></p>
             <button onClick={() => { setUsuarioActual(null); setVista('login'); }} style={{ marginTop: '20px', padding: '8px 16px', background: '#ef4444', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>
               Cerrar Sesión
@@ -213,20 +213,22 @@ export default function Home() {
           <div>
             <h2>Panel de Administración</h2>
             <p>Gestión de usuarios registrados en Supabase:</p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '300px', overflowY: 'auto', marginTop: '15px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '400px', overflowY: 'auto', marginTop: '15px' }}>
               {usuariosLista.map((u) => (
                 <div key={u.id} style={{ background: '#334155', padding: '12px', borderRadius: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div>
                     <strong>{u.nombre}</strong> ({u.email})<br/>
-                    <small>Estatus: {u.estatus} | Saldo: ${u.saldo}</small>
+                    <small>Estatus: <strong>{u.estatus}</strong> | Saldo: ${u.saldo} MXN</small>
                   </div>
                   <div style={{ display: 'flex', gap: '8px' }}>
+                    {/* Botón Activar / Desactivar */}
                     <button 
                       onClick={() => u.id && cambiarEstatus(u.id, u.estatus)}
                       style={{ padding: '6px 10px', background: u.estatus === 'activo' ? '#eab308' : '#22c55e', color: '#0f172a', fontWeight: 'bold', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
                     >
                       {u.estatus === 'activo' ? 'Desactivar' : 'Activar'}
                     </button>
+                    {/* Botón Eliminar por completo */}
                     <button 
                       onClick={() => u.id && eliminarUsuario(u.id)}
                       style={{ padding: '6px 10px', background: '#ef4444', color: '#fff', fontWeight: 'bold', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
