@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { 
   ShoppingBag, 
   Wallet, 
@@ -69,10 +69,85 @@ export default function VisbackDashboard() {
   const [adminNuevoPass, setAdminNuevoPass] = useState('');
   const [adminNuevoEstado, setAdminNuevoEstado] = useState<'activo' | 'pendiente'>('activo');
 
-  const [usuariosRegistrados, setUsuariosRegistrados] = useState<Usuario[]>([
-    { email: 'admin@visback.com', pass: 'admin123', nombre: 'Administrador', rol: 'admin', estado: 'activo', saldo: 500.00 },
-    { email: 'cliente@visback.com', pass: '123456', nombre: 'Brandon Beltran', rol: 'cliente', estado: 'activo', saldo: 125.00 }
-  ]);
+  // Estados con persistencia en localStorage para que NADA se borre al recargar
+  const [usuariosRegistrados, setUsuariosRegistrados] = useState<Usuario[]>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('visback_usuarios');
+      if (saved) {
+        try { return JSON.parse(saved); } catch (e) { console.error(e); }
+      }
+    }
+    return [
+      { email: 'admin@visback.com', pass: 'admin123', nombre: 'Administrador', rol: 'admin', estado: 'activo', saldo: 500.00 },
+      { email: 'cliente@visback.com', pass: '123456', nombre: 'Brandon Beltran', rol: 'cliente', estado: 'activo', saldo: 125.00 }
+    ];
+  });
+
+  const [productos, setProductos] = useState<Producto[]>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('visback_productos');
+      if (saved) {
+        try { return JSON.parse(saved); } catch (e) { console.error(e); }
+      }
+    }
+    return [
+      { id: 1, nombre: 'Netflix Perfil 1M', desc: 'Respetar 1 Dispositivo', precio: 45.00 },
+      { id: 2, nombre: 'Crunchyroll Fan 1M', desc: 'Cuenta Completa 1 Mes', precio: 38.00 },
+      { id: 3, nombre: 'Max Perfil 1M', desc: 'Respetar 1 Dispositivo', precio: 9.00 },
+      { id: 4, nombre: 'ViX Premium 1M', desc: 'Premium 5 Perfiles', precio: 10.00 },
+    ];
+  });
+
+  const [inventarioCredenciales, setInventarioCredenciales] = useState<CredencialInventario[]>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('visback_inventario');
+      if (saved) {
+        try { return JSON.parse(saved); } catch (e) { console.error(e); }
+      }
+    }
+    return [
+      { id: 1, productoId: 1, correo: 'net1@visback.com', pass: 'pass123', pin: '1111', estado: 'disponible' },
+      { id: 2, productoId: 1, correo: 'net2@visback.com', pass: 'pass456', pin: '2222', estado: 'disponible' },
+      { id: 3, productoId: 4, correo: 'vix1@visback.com', pass: 'vixpass', pin: '3333', estado: 'disponible' },
+    ];
+  });
+
+  const [compras, setCompras] = useState<Compra[]>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('visback_compras');
+      if (saved) {
+        try { return JSON.parse(saved); } catch (e) { console.error(e); }
+      }
+    }
+    return [
+      { id: '#002004', producto: 'ViX Premium 1M', correo: 'vixprem1@gmail.com', pass: 'vix2026', pin: '1234', precio: 10.00, vencimiento: '24/10/2026', estado: 'Activa' },
+    ];
+  });
+
+  // Guardar automáticamente en localStorage cada vez que cambien los datos
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('visback_usuarios', JSON.stringify(usuariosRegistrados));
+    }
+  }, [usuariosRegistrados]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('visback_productos', JSON.stringify(productos));
+    }
+  }, [productos]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('visback_inventario', JSON.stringify(inventarioCredenciales));
+    }
+  }, [inventarioCredenciales]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('visback_compras', JSON.stringify(compras));
+    }
+  }, [compras]);
 
   const [usuarioActual, setUsuarioActual] = useState<Usuario | null>(null);
   const [activeTab, setActiveTab] = useState<'inicio' | 'compras' | 'billetera' | 'admin'>('inicio');
@@ -85,7 +160,6 @@ export default function VisbackDashboard() {
   const [nuevoProdDesc, setNuevoProdDesc] = useState('');
   const [nuevoProdPrecio, setNuevoProdPrecio] = useState('');
 
-  // Estados para Carga Unitaria y Carga Masiva
   const [credProdId, setCredProdId] = useState<number>(1);
   const [credCorreo, setCredCorreo] = useState('');
   const [credPass, setCredPass] = useState('');
@@ -94,23 +168,6 @@ export default function VisbackDashboard() {
 
   const [cantidadesRecarga, setCantidadesRecarga] = useState<{ [key: string]: string }>({});
   const whatsappNumber = "5217734092937";
-
-  const [compras, setCompras] = useState<Compra[]>([
-    { id: '#002004', producto: 'ViX Premium 1M', correo: 'vixprem1@gmail.com', pass: 'vix2026', pin: '1234', precio: 10.00, vencimiento: '24/10/2026', estado: 'Activa' },
-  ]);
-
-  const [productos, setProductos] = useState<Producto[]>([
-    { id: 1, nombre: 'Netflix Perfil 1M', desc: 'Respetar 1 Dispositivo', precio: 45.00 },
-    { id: 2, nombre: 'Crunchyroll Fan 1M', desc: 'Cuenta Completa 1 Mes', precio: 38.00 },
-    { id: 3, nombre: 'Max Perfil 1M', desc: 'Respetar 1 Dispositivo', precio: 9.00 },
-    { id: 4, nombre: 'ViX Premium 1M', desc: 'Premium 5 Perfiles', precio: 10.00 },
-  ]);
-
-  const [inventarioCredenciales, setInventarioCredenciales] = useState<CredencialInventario[]>([
-    { id: 1, productoId: 1, correo: 'net1@visback.com', pass: 'pass123', pin: '1111', estado: 'disponible' },
-    { id: 2, productoId: 1, correo: 'net2@visback.com', pass: 'pass456', pin: '2222', estado: 'disponible' },
-    { id: 3, productoId: 4, correo: 'vix1@visback.com', pass: 'vixpass', pin: '3333', estado: 'disponible' },
-  ]);
 
   const obtenerStock = (productoId: number) => {
     return inventarioCredenciales.filter(c => c.productoId === productoId && c.estado === 'disponible').length;
@@ -157,7 +214,14 @@ export default function VisbackDashboard() {
       saldo: 0.00
     };
     setUsuariosRegistrados(prev => [...prev, nuevo]);
-    alert("¡Registro exitoso! Tu cuenta está pendiente de activación. Contacta al admin por WhatsApp para aprobarla.");
+
+    // Redirección a WhatsApp con los datos del registro
+    const mensaje = encodeURIComponent(`Hola Visback Stream, me acabo de registrar. \n\nNombre: ${regNombre}\nCorreo: ${regEmail}\nContraseña: ${regPassword}\n\nSolicito la activación de mi cuenta.`);
+    window.open(`https://wa.me/${whatsappNumber}?text=${mensaje}`, '_blank');
+
+    setRegNombre('');
+    setRegEmail('');
+    setRegPassword('');
     setViewMode('login');
   };
 
@@ -275,7 +339,6 @@ export default function VisbackDashboard() {
     alert("¡Credencial agregada al inventario! El stock ha aumentado automáticamente.");
   };
 
-  // Función de Carga Masiva de Credenciales
   const agregarCredencialMasiva = (e: React.FormEvent) => {
     e.preventDefault();
     if (!textoMasivo.trim()) {
@@ -376,7 +439,7 @@ export default function VisbackDashboard() {
           <div className="space-y-4 relative z-20">
             <input 
               type="email" 
-              placeholder="Correo" 
+              placeholder="Correo electrónico" 
               ref={loginEmailRef}
               defaultValue=""
               className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-purple-500" 
@@ -423,7 +486,7 @@ export default function VisbackDashboard() {
             <input type="email" placeholder="Correo" value={regEmail} onChange={e => setRegEmail(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-emerald-500" />
             <input type="password" placeholder="Contraseña" value={regPassword} onChange={e => setRegPassword(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-emerald-500" />
             <button type="submit" className="w-full bg-emerald-600 text-white font-bold py-3.5 rounded-xl text-sm cursor-pointer hover:bg-emerald-700 transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/30">
-              <MessageCircle size={18} /> Registrarse y Solicitar Activación
+              <MessageCircle size={18} /> Registrarse y Enviar a WhatsApp
             </button>
           </form>
           <div className="text-center pt-4 border-t border-slate-800">
@@ -534,13 +597,13 @@ export default function VisbackDashboard() {
                 </form>
               </div>
 
-              {/* 🚀 CARGA MASIVA DE CREDENCIALES (NUEVO) */}
+              {/* Carga Masiva */}
               <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
                 <h4 className="font-bold text-lg text-slate-800 flex items-center gap-2 text-purple-700">
                   <KeyRound size={20} /> Carga Masiva de Credenciales (Suma Stock Automático)
                 </h4>
                 <p className="text-slate-500 text-xs">
-                  Pega tu lista de cuentas completa. Cada línea representa una cuenta con formato: <code className="bg-slate-100 px-1 py-0.5 rounded text-purple-600 font-bold">correo pass pin</code> (o separadas por comas).
+                  Pega tu lista de cuentas completa. Cada línea representa una cuenta con formato: <code className="bg-slate-100 px-1 py-0.5 rounded text-purple-600 font-bold">correo pass pin</code>.
                 </p>
                 <form onSubmit={agregarCredencialMasiva} className="space-y-4">
                   <div className="max-w-xs">
