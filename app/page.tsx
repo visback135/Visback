@@ -400,10 +400,24 @@ export default function VisbackDashboard() {
     alert("¡Producto agregado con éxito y guardado en Google Sheets!");
   };
 
-  const eliminarProducto = (id: number) => {
-    setProductos(prev => prev.filter(p => p.id !== id));
-    setInventarioCredenciales(prev => prev.filter(c => c.productoId !== id));
-    alert("Producto eliminado.");
+  const eliminarProducto = async (id: number) => {
+    if (confirm("¿Estás seguro de eliminar este producto del catálogo y de Google Sheets?")) {
+      setProductos(prev => prev.filter(p => p.id !== id));
+      setInventarioCredenciales(prev => prev.filter(c => c.productoId !== id));
+
+      try {
+        await fetch(GOOGLE_SHEET_URL, {
+          method: 'POST',
+          mode: 'no-cors',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'delete_producto', id: id })
+        });
+      } catch (err) {
+        console.error("Error al eliminar producto en Sheets:", err);
+      }
+
+      alert("Producto eliminado con éxito.");
+    }
   };
 
   const agregarCredencialInventario = async (e: React.FormEvent) => {
@@ -509,7 +523,6 @@ export default function VisbackDashboard() {
       return;
     }
 
-    // Buscar una credencial que esté disponible
     const credencialDisponible = inventarioCredenciales.find(
       c => c.productoId === productoAConfirmar.id && c.estado === 'disponible'
     );
@@ -520,12 +533,10 @@ export default function VisbackDashboard() {
       return;
     }
 
-    // Marcar como 'vendida' localmente para que nunca se vuelva a usar
     setInventarioCredenciales(prev => prev.map(c => 
       c.id === credencialDisponible.id ? { ...c, estado: 'vendida' } : c
     ));
 
-    // Sincronizar estado 'vendida' a Google Sheets en la pestaña INVENTARIO
     try {
       await fetch(GOOGLE_SHEET_URL, {
         method: 'POST',
@@ -534,7 +545,7 @@ export default function VisbackDashboard() {
         body: JSON.stringify({ action: 'vender_credencial', id: credencialDisponible.id })
       });
     } catch (err) {
-      console.error("Error al marcar credencial como vendida en Sheets:", err);
+      console.error(err);
     }
 
     const nuevoSaldo = usuarioActual.saldo - productoAConfirmar.precio;
@@ -547,7 +558,6 @@ export default function VisbackDashboard() {
 
     setUsuariosRegistrados(prev => prev.map(u => u.email === usuarioActual.email ? { ...u, saldo: nuevoSaldo } : u));
 
-    // Actualizar saldo descontado en Google Sheets
     try {
       await fetch(GOOGLE_SHEET_URL, {
         method: 'POST',
