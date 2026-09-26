@@ -15,7 +15,8 @@ import {
   KeyRound,
   Clock,
   Trash2,
-  RefreshCw
+  RefreshCw,
+  UserPlus
 } from 'lucide-react';
 
 interface Producto {
@@ -65,6 +66,12 @@ export default function VisbackDashboard() {
   const [regNombre, setRegNombre] = useState('');
   const [regEmail, setRegEmail] = useState('');
   const [regPassword, setRegPassword] = useState('');
+
+  // Estados para agregar cliente desde Admin
+  const [adminNuevoNombre, setAdminNuevoNombre] = useState('');
+  const [adminNuevoEmail, setAdminNuevoEmail] = useState('');
+  const [adminNuevoPass, setAdminNuevoPass] = useState('');
+  const [adminNuevoEstado, setAdminNuevoEstado] = useState<'activo' | 'pendiente'>('activo');
 
   const [usuarioActual, setUsuarioActual] = useState<Usuario | null>(null);
   const [activeTab, setActiveTab] = useState<'inicio' | 'compras' | 'billetera' | 'admin'>('inicio');
@@ -208,6 +215,36 @@ export default function VisbackDashboard() {
     setRegEmail('');
     setRegPassword('');
     setViewMode('login');
+  };
+
+  const agregarClienteAdmin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!adminNuevoNombre || !adminNuevoEmail || !adminNuevoPass) {
+      alert("Completa todos los campos del cliente.");
+      return;
+    }
+    const nuevoCliente: Usuario = {
+      email: adminNuevoEmail,
+      pass: adminNuevoPass,
+      nombre: adminNuevoNombre,
+      rol: 'cliente',
+      estado: adminNuevoEstado,
+      saldo: 0.00
+    };
+    setUsuariosRegistrados(prev => [...prev, nuevoCliente]);
+    try {
+      await fetch(GOOGLE_SHEET_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'add_usuario', ...nuevoCliente })
+      });
+    } catch (err) { console.error(err); }
+    setAdminNuevoNombre('');
+    setAdminNuevoEmail('');
+    setAdminNuevoPass('');
+    alert("¡Cliente agregado con éxito a Google Sheets!");
+    setTimeout(sincronizarConGoogleSheets, 1000);
   };
 
   const eliminarUsuario = async (email: string) => {
@@ -547,6 +584,21 @@ export default function VisbackDashboard() {
               <div className="bg-gradient-to-r from-amber-600 to-orange-700 rounded-3xl p-6 text-white shadow-xl">
                 <h3 className="text-2xl font-bold">Panel de Administración 🛡️</h3>
                 <p className="text-amber-100 text-sm mt-1">Control total de productos, catálogo, inventario y saldos.</p>
+              </div>
+
+              {/* AGREGAR NUEVO CLIENTE DESDE ADMIN */}
+              <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+                <h4 className="font-bold text-lg text-slate-800 flex items-center gap-2">
+                  <UserPlus size={20} className="text-purple-600" /> Registrar Nuevo Cliente Directamente
+                </h4>
+                <form onSubmit={agregarClienteAdmin} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <input type="text" placeholder="Nombre completo" value={adminNuevoNombre} onChange={e => setAdminNuevoNombre(e.target.value)} className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm" />
+                  <input type="email" placeholder="Correo electrónico" value={adminNuevoEmail} onChange={e => setAdminNuevoEmail(e.target.value)} className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm" />
+                  <input type="password" placeholder="Contraseña" value={adminNuevoPass} onChange={e => setAdminNuevoPass(e.target.value)} className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm" />
+                  <button type="submit" className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2.5 rounded-xl text-sm cursor-pointer shadow-md">
+                    Crear Cuenta de Cliente
+                  </button>
+                </form>
               </div>
 
               {/* Agregar Producto */}
