@@ -15,8 +15,7 @@ import {
   KeyRound,
   Clock,
   Trash2,
-  RefreshCw,
-  UserPlus
+  RefreshCw
 } from 'lucide-react';
 
 interface Producto {
@@ -66,11 +65,6 @@ export default function VisbackDashboard() {
   const [regNombre, setRegNombre] = useState('');
   const [regEmail, setRegEmail] = useState('');
   const [regPassword, setRegPassword] = useState('');
-
-  const [adminNuevoNombre, setAdminNuevoNombre] = useState('');
-  const [adminNuevoEmail, setAdminNuevoEmail] = useState('');
-  const [adminNuevoPass, setAdminNuevoPass] = useState('');
-  const [adminNuevoEstado, setAdminNuevoEstado] = useState<'activo' | 'pendiente'>('activo');
 
   const [usuarioActual, setUsuarioActual] = useState<Usuario | null>(null);
   const [activeTab, setActiveTab] = useState<'inicio' | 'compras' | 'billetera' | 'admin'>('inicio');
@@ -208,42 +202,12 @@ export default function VisbackDashboard() {
       alert("Completa todos los campos.");
       return;
     }
-
     const mensaje = encodeURIComponent(`Hola Visback Stream, me quiero registrar.\n\nNombre: ${regNombre}\nCorreo: ${regEmail}\nContraseña: ${regPassword}`);
     window.open(`https://wa.me/${whatsappNumber}?text=${mensaje}`, '_blank');
     setRegNombre('');
     setRegEmail('');
     setRegPassword('');
     setViewMode('login');
-  };
-
-  const agregarClienteAdmin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!adminNuevoNombre || !adminNuevoEmail || !adminNuevoPass) {
-      alert("Completa todos los campos del cliente.");
-      return;
-    }
-    const nuevoCliente: Usuario = {
-      email: adminNuevoEmail,
-      pass: adminNuevoPass,
-      nombre: adminNuevoNombre,
-      rol: 'cliente',
-      estado: adminNuevoEstado,
-      saldo: 0.00
-    };
-    setUsuariosRegistrados(prev => [...prev, nuevoCliente]);
-    try {
-      await fetch(GOOGLE_SHEET_URL, {
-        method: 'POST',
-        mode: 'no-cors',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'add_usuario', ...nuevoCliente })
-      });
-    } catch (err) { console.error(err); }
-    setAdminNuevoNombre('');
-    setAdminNuevoEmail('');
-    setAdminNuevoPass('');
-    alert("¡Cliente agregado con éxito!");
   };
 
   const eliminarUsuario = async (email: string) => {
@@ -325,10 +289,11 @@ export default function VisbackDashboard() {
     setNuevoProdDesc('');
     setNuevoProdPrecio('');
     alert("¡Producto agregado con éxito!");
+    setTimeout(sincronizarConGoogleSheets, 1000);
   };
 
   const eliminarProducto = async (id: string) => {
-    if (confirm("¿Eliminar este producto?")) {
+    if (confirm("¿Estás seguro de eliminar este producto del catálogo?")) {
       setProductos(prev => prev.filter(p => p.id !== id));
       try {
         await fetch(GOOGLE_SHEET_URL, {
@@ -338,6 +303,8 @@ export default function VisbackDashboard() {
           body: JSON.stringify({ action: 'delete_producto', id })
         });
       } catch (err) { console.error(err); }
+      alert("¡Producto eliminado del catálogo!");
+      setTimeout(sincronizarConGoogleSheets, 1000);
     }
   };
 
@@ -579,7 +546,7 @@ export default function VisbackDashboard() {
             <div className="space-y-6">
               <div className="bg-gradient-to-r from-amber-600 to-orange-700 rounded-3xl p-6 text-white shadow-xl">
                 <h3 className="text-2xl font-bold">Panel de Administración 🛡️</h3>
-                <p className="text-amber-100 text-sm mt-1">Control de productos, clientes, saldo e inventario vinculado por ID.</p>
+                <p className="text-amber-100 text-sm mt-1">Control total de productos, catálogo, inventario y saldos.</p>
               </div>
 
               {/* Agregar Producto */}
@@ -588,12 +555,45 @@ export default function VisbackDashboard() {
                   <PlusCircle size={20} className="text-purple-600" /> Agregar Producto al Catálogo
                 </h4>
                 <form onSubmit={agregarProductoAdmin} className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <input type="text" placeholder="ID (ej. netflix)" value={nuevoProdId} onChange={e => setNuevoProdId(e.target.value)} className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-mono" />
+                  <input type="text" placeholder="ID único (ej. netflix)" value={nuevoProdId} onChange={e => setNuevoProdId(e.target.value)} className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-mono" />
                   <input type="text" placeholder="Nombre (ej. Netflix 1M)" value={nuevoProdNombre} onChange={e => setNuevoProdNombre(e.target.value)} className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm" />
                   <input type="number" placeholder="Precio ($ MXN)" value={nuevoProdPrecio} onChange={e => setNuevoProdPrecio(e.target.value)} className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm" />
-                  <input type="text" placeholder="Descripción" value={nuevoProdDesc} onChange={e => setNuevoProdDesc(e.target.value)} className="sm:col-span-3 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm" />
-                  <button type="submit" className="sm:col-span-3 bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 rounded-xl text-sm cursor-pointer">Guardar Producto</button>
+                  <input type="text" placeholder="Descripción (ej. Respetar 1 dispositivo)" value={nuevoProdDesc} onChange={e => setNuevoProdDesc(e.target.value)} className="sm:col-span-3 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm" />
+                  <button type="submit" className="sm:col-span-3 bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 rounded-xl text-sm cursor-pointer shadow-md shadow-purple-600/20">Publicar Producto en la Tienda</button>
                 </form>
+              </div>
+
+              {/* LISTA DE PRODUCTOS EN EL CATÁLOGO CON BOTÓN DE ELIMINAR */}
+              <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+                <h4 className="font-bold text-lg text-slate-800 flex items-center gap-2">
+                  <ShoppingBag size={20} className="text-purple-600" /> Productos Actuales en la Tienda ({productos.length})
+                </h4>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm">
+                    <thead>
+                      <tr className="bg-slate-50 text-slate-500 font-bold uppercase border-b text-xs">
+                        <th className="p-3">ID</th>
+                        <th className="p-3">Nombre</th>
+                        <th className="p-3">Precio</th>
+                        <th className="p-3 text-center">Acción</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {productos.map(p => (
+                        <tr key={p.id}>
+                          <td className="p-3 font-mono font-bold text-purple-600">{p.id}</td>
+                          <td className="p-3 font-semibold">{p.nombre}</td>
+                          <td className="p-3 font-bold">${p.precio.toFixed(2)} MXN</td>
+                          <td className="p-3 text-center">
+                            <button onClick={() => eliminarProducto(p.id)} className="bg-red-100 text-red-600 hover:bg-red-200 px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition-all">
+                              Eliminar de la Tienda
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
 
               {/* Agregar Credencial Individual */}
@@ -610,7 +610,7 @@ export default function VisbackDashboard() {
                   <input type="text" placeholder="Correo" value={credCorreo} onChange={e => setCredCorreo(e.target.value)} className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm" />
                   <input type="text" placeholder="Contraseña" value={credPass} onChange={e => setCredPass(e.target.value)} className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm" />
                   <input type="text" placeholder="PIN (Opcional)" value={credPin} onChange={e => setCredPin(e.target.value)} className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm" />
-                  <button type="submit" className="sm:col-span-2 lg:col-span-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl text-sm cursor-pointer">Guardar Credencial y Aumentar Stock</button>
+                  <button type="submit" className="sm:col-span-2 lg:col-span-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl text-sm cursor-pointer shadow-md">Guardar Credencial y Aumentar Stock</button>
                 </form>
               </div>
 
@@ -632,7 +632,7 @@ export default function VisbackDashboard() {
                     <label className="block text-xs font-bold text-slate-700 mb-1">Cuentas (Una por renglón: correo pass pin):</label>
                     <textarea rows={4} placeholder="correo1@gmail.com pass123 1234&#10;correo2@gmail.com pass456 5678" value={textoMasivo} onChange={e => setTextoMasivo(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl p-4 text-xs font-mono" />
                   </div>
-                  <button type="submit" className="bg-purple-600 hover:bg-purple-700 text-white font-bold px-6 py-3 rounded-xl text-sm cursor-pointer">Cargar Masivamente</button>
+                  <button type="submit" className="bg-purple-600 hover:bg-purple-700 text-white font-bold px-6 py-3 rounded-xl text-sm cursor-pointer shadow-md">Cargar Masivamente</button>
                 </form>
               </div>
 
