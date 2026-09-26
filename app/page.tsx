@@ -391,13 +391,13 @@ export default function VisbackDashboard() {
         body: JSON.stringify({ action: 'add_producto', ...nuevoProducto })
       });
     } catch (err) {
-      console.error(err);
+      console.error("Error al guardar producto en Sheets:", err);
     }
 
     setNuevoProdNombre('');
     setNuevoProdDesc('');
     setNuevoProdPrecio('');
-    alert("¡Producto agregado con éxito!");
+    alert("¡Producto agregado con éxito y guardado en Google Sheets!");
   };
 
   const eliminarProducto = (id: number) => {
@@ -509,6 +509,7 @@ export default function VisbackDashboard() {
       return;
     }
 
+    // Buscar una credencial que esté disponible
     const credencialDisponible = inventarioCredenciales.find(
       c => c.productoId === productoAConfirmar.id && c.estado === 'disponible'
     );
@@ -519,10 +520,12 @@ export default function VisbackDashboard() {
       return;
     }
 
+    // Marcar como 'vendida' localmente para que nunca se vuelva a usar
     setInventarioCredenciales(prev => prev.map(c => 
       c.id === credencialDisponible.id ? { ...c, estado: 'vendida' } : c
     ));
 
+    // Sincronizar estado 'vendida' a Google Sheets en la pestaña INVENTARIO
     try {
       await fetch(GOOGLE_SHEET_URL, {
         method: 'POST',
@@ -531,7 +534,7 @@ export default function VisbackDashboard() {
         body: JSON.stringify({ action: 'vender_credencial', id: credencialDisponible.id })
       });
     } catch (err) {
-      console.error(err);
+      console.error("Error al marcar credencial como vendida en Sheets:", err);
     }
 
     const nuevoSaldo = usuarioActual.saldo - productoAConfirmar.precio;
@@ -544,7 +547,7 @@ export default function VisbackDashboard() {
 
     setUsuariosRegistrados(prev => prev.map(u => u.email === usuarioActual.email ? { ...u, saldo: nuevoSaldo } : u));
 
-    // También actualizar el saldo descontado en Sheets
+    // Actualizar saldo descontado en Google Sheets
     try {
       await fetch(GOOGLE_SHEET_URL, {
         method: 'POST',
@@ -719,7 +722,7 @@ export default function VisbackDashboard() {
                   <input type="text" placeholder="Descripción (Ej. Respetar dispositivo)" value={nuevoProdDesc} onChange={e => setNuevoProdDesc(e.target.value)} className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm" />
                   <input type="number" placeholder="Precio ($ MXN)" value={nuevoProdPrecio} onChange={e => setNuevoProdPrecio(e.target.value)} className="sm:col-span-2 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm" />
                   <button type="submit" className="sm:col-span-2 bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 rounded-xl text-sm cursor-pointer transition-all shadow-md shadow-purple-600/20">
-                    Publicar Producto en la Tienda y Cloud
+                    Publicar Producto en la Tienda y Google Sheets
                   </button>
                 </form>
               </div>
