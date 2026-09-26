@@ -324,7 +324,7 @@ export default function VisbackDashboard() {
     }
   };
 
-  const ajustarSaldoUsuario = (email: string, tipo: 'agregar' | 'quitar') => {
+  const ajustarSaldoUsuario = async (email: string, tipo: 'agregar' | 'quitar') => {
     const montoStr = cantidadesRecarga[email];
     const monto = parseFloat(montoStr);
     if (!monto || isNaN(monto) || monto <= 0) {
@@ -332,10 +332,13 @@ export default function VisbackDashboard() {
       return;
     }
 
-    setUsuariosRegistrados(prev => prev.map(u => {
+    let saldoFinalCalculado = 0;
+
+    const usuariosActualizados = usuariosRegistrados.map(u => {
       if (u.email === email) {
         let nuevoSaldo = tipo === 'agregar' ? u.saldo + monto : u.saldo - monto;
         if (nuevoSaldo < 0) nuevoSaldo = 0;
+        saldoFinalCalculado = nuevoSaldo;
 
         if (usuarioActual?.email === email) {
           const actualizado = { ...u, saldo: nuevoSaldo };
@@ -347,10 +350,23 @@ export default function VisbackDashboard() {
         return { ...u, saldo: nuevoSaldo };
       }
       return u;
-    }));
+    });
+
+    setUsuariosRegistrados(usuariosActualizados);
+
+    try {
+      await fetch(GOOGLE_SHEET_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'update_saldo', email: email, saldo: saldoFinalCalculado })
+      });
+    } catch (err) {
+      console.error("Error al actualizar saldo en Sheets:", err);
+    }
 
     setCantidadesRecarga(prev => ({ ...prev, [email]: '' }));
-    alert(`¡Saldo actualizado con éxito!`);
+    alert(`¡Saldo actualizado con éxito y guardado en Google Sheets!`);
   };
 
   const agregarProductoAdmin = async (e: React.FormEvent) => {
@@ -527,6 +543,18 @@ export default function VisbackDashboard() {
     }
 
     setUsuariosRegistrados(prev => prev.map(u => u.email === usuarioActual.email ? { ...u, saldo: nuevoSaldo } : u));
+
+    // También actualizar el saldo descontado en Sheets
+    try {
+      await fetch(GOOGLE_SHEET_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'update_saldo', email: usuarioActual.email, saldo: nuevoSaldo })
+      });
+    } catch (err) {
+      console.error(err);
+    }
 
     const nuevaCompra: Compra = {
       id: `#${Math.floor(100000 + Math.random() * 900000)}`,
