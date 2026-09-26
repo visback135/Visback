@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 
 interface Producto {
-  id: number;
+  id: string;
   nombre: string;
   desc: string;
   precio: number;
@@ -27,7 +27,7 @@ interface Producto {
 
 interface CredencialInventario {
   id: number;
-  productoId: number;
+  productoId: string;
   correo: string;
   pass: string;
   pin: string;
@@ -71,6 +71,11 @@ export default function VisbackDashboard() {
   const [adminNuevoPass, setAdminNuevoPass] = useState('');
   const [adminNuevoEstado, setAdminNuevoEstado] = useState<'activo' | 'pendiente'>('activo');
 
+  // ESTADOS DECLARADOS PRIMERO (Evita el error de "used before its declaration")
+  const [usuarioActual, setUsuarioActual] = useState<Usuario | null>(null);
+  const [activeTab, setActiveTab] = useState<'inicio' | 'compras' | 'billetera' | 'admin'>('inicio');
+  const [menuAbierto, setMenuAbierto] = useState(false);
+
   const [usuariosRegistrados, setUsuariosRegistrados] = useState<Usuario[]>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('visback_usuarios_db');
@@ -92,10 +97,11 @@ export default function VisbackDashboard() {
       }
     }
     return [
-      { id: 1, nombre: 'Netflix Perfil 1M', desc: 'Respetar 1 Dispositivo', precio: 45.00 },
-      { id: 2, nombre: 'Crunchyroll Fan 1M', desc: 'Cuenta Completa 1 Mes', precio: 38.00 },
-      { id: 3, nombre: 'Max Perfil 1M', desc: 'Respetar 1 Dispositivo', precio: 9.00 },
-      { id: 4, nombre: 'ViX Premium 1M', desc: 'Premium 5 Perfiles', precio: 10.00 },
+      { id: 'netflix', nombre: 'Netflix Perfil 1M', desc: 'Respetar 1 Dispositivo', precio: 45.00 },
+      { id: 'crunchyroll', nombre: 'Crunchyroll Fan 1M', desc: 'Cuenta Completa 1 Mes', precio: 38.00 },
+      { id: 'max', nombre: 'Max Perfil 1M', desc: 'Respetar 1 Dispositivo', precio: 9.00 },
+      { id: 'vix', nombre: 'ViX Premium 1M', desc: 'Premium 5 Perfiles', precio: 10.00 },
+      { id: 'disney', nombre: 'Disney+ 1M', desc: 'Respetar 1 Dispositivo', precio: 20.00 },
     ];
   });
 
@@ -118,6 +124,23 @@ export default function VisbackDashboard() {
     }
     return [];
   });
+
+  const [productoAConfirmar, setProductoAConfirmar] = useState<Producto | null>(null);
+  const [compraExitosa, setCompraExitosa] = useState<Compra | null>(null);
+
+  const [nuevoProdId, setNuevoProdId] = useState('');
+  const [nuevoProdNombre, setNuevoProdNombre] = useState('');
+  const [nuevoProdDesc, setNuevoProdDesc] = useState('');
+  const [nuevoProdPrecio, setNuevoProdPrecio] = useState('');
+
+  const [credProdId, setCredProdId] = useState<string>('netflix');
+  const [credCorreo, setCredCorreo] = useState('');
+  const [credPass, setCredPass] = useState('');
+  const [credPin, setCredPin] = useState('');
+  const [textoMasivo, setTextoMasivo] = useState('');
+
+  const [cantidadesRecarga, setCantidadesRecarga] = useState<{ [key: string]: string }>({});
+  const whatsappNumber = "5217734092937";
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -143,25 +166,23 @@ export default function VisbackDashboard() {
     }
   }, [compras]);
 
-  const [credProdId, setCredProdId] = useState<number>(1);
-
   useEffect(() => {
-    if (productos.length > 0 && (credProdId === 1 || !productos.some(p => p.id === credProdId))) {
+    if (productos.length > 0 && !productos.some(p => p.id === credProdId)) {
       setCredProdId(productos[0].id);
     }
-  }, [productos]);
+  }, [productos, credProdId]);
 
   const sincronizarConGoogleSheets = () => {
     fetch(GOOGLE_SHEET_URL + "?t=" + Date.now())
       .then(res => res.json())
-      .then(data => {
+      .then((data: any) => {
         if (data.usuarios && Array.isArray(data.usuarios) && data.usuarios.length > 0) {
           const formU: Usuario[] = data.usuarios.map((u: any) => ({
-            email: u.email || '',
-            pass: u.pass || '',
-            nombre: u.nombre || '',
-            rol: (u.rol === 'admin' ? 'admin' : 'cliente'),
-            estado: (u.estado === 'pendiente' ? 'pendiente' : 'activo'),
+            email: String(u.email || '').trim(),
+            pass: String(u.pass || '').trim(),
+            nombre: String(u.nombre || '').trim(),
+            rol: (String(u.rol).trim() === 'admin' ? 'admin' : 'cliente'),
+            estado: (String(u.estado).trim() === 'pendiente' ? 'pendiente' : 'activo'),
             saldo: Number(u.saldo) || 0
           }));
           if (!formU.some(u => u.email === 'admin@visback.com')) {
@@ -172,30 +193,30 @@ export default function VisbackDashboard() {
 
         if (data.productos && Array.isArray(data.productos) && data.productos.length > 0) {
           const formP: Producto[] = data.productos.map((p: any) => ({
-            id: Number(p.id) || Date.now(),
-            nombre: p.nombre || '',
-            desc: p.desc || '',
+            id: String(p.id || '').trim().toLowerCase(),
+            nombre: String(p.nombre || '').trim(),
+            desc: String(p.desc || '').trim(),
             precio: Number(p.precio) || 0
-          }));
+          })).filter((p: any) => p.id && p.id !== '0');
           setProductos(formP);
           if (formP.length > 0 && !formP.some(p => p.id === credProdId)) {
             setCredProdId(formP[0].id);
           }
         }
 
-        if (data.inventario && Array.isArray(data.inventario) && data.inventario.length > 0) {
+        if (data.inventario && Array.isArray(data.inventario)) {
           const formI: CredencialInventario[] = data.inventario.map((i: any) => ({
             id: Number(i.id) || Date.now(),
-            productoId: Number(i.productoId) || 0,
-            correo: i.correo || '',
-            pass: i.pass || '',
-            pin: i.pin || 'N/A',
+            productoId: String(i.productoId || '').trim().toLowerCase(),
+            correo: String(i.correo || '').trim(),
+            pass: String(i.pass || '').trim(),
+            pin: String(i.pin || 'N/A').trim(),
             estado: (String(i.estado).trim().toLowerCase() === 'vendida' ? 'vendida' : 'disponible')
-          }));
+          })).filter((i: any) => i.productoId && i.productoId !== '0' && i.productoId !== 'desconocido');
           setInventarioCredenciales(formI);
         }
       })
-      .catch(err => console.error("Aviso: Usando respaldo local", err));
+      .catch((err: any) => console.error("Aviso: Usando respaldo local", err));
   };
 
   useEffect(() => {
@@ -221,27 +242,13 @@ export default function VisbackDashboard() {
     }
   }, [activeTab]);
 
-  const [usuarioActual, setUsuarioActual] = useState<Usuario | null>(null);
-  const [activeTab, setActiveTab] = useState<'inicio' | 'compras' | 'billetera' | 'admin'>('inicio');
-  const [menuAbierto, setMenuAbierto] = useState(false);
-
-  const [productoAConfirmar, setProductoAConfirmar] = useState<Producto | null>(null);
-  const [compraExitosa, setCompraExitosa] = useState<Compra | null>(null);
-
-  const [nuevoProdNombre, setNuevoProdNombre] = useState('');
-  const [nuevoProdDesc, setNuevoProdDesc] = useState('');
-  const [nuevoProdPrecio, setNuevoProdPrecio] = useState('');
-
-  const [credCorreo, setCredCorreo] = useState('');
-  const [credPass, setCredPass] = useState('');
-  const [credPin, setCredPin] = useState('');
-  const [textoMasivo, setTextoMasivo] = useState('');
-
-  const [cantidadesRecarga, setCantidadesRecarga] = useState<{ [key: string]: string }>({});
-  const whatsappNumber = "5217734092937";
-
-  const obtenerStock = (productoId: number) => {
-    return inventarioCredenciales.filter(c => Number(c.productoId) === Number(productoId) && String(c.estado).trim().toLowerCase() === 'disponible').length;
+  const obtenerStock = (productoId: string) => {
+    const idBusqueda = String(productoId).trim().toLowerCase();
+    return inventarioCredenciales.filter(c => {
+      const idInv = String(c.productoId || '').trim().toLowerCase();
+      const estado = String(c.estado || '').trim().toLowerCase();
+      return idInv === idBusqueda && estado === 'disponible';
+    }).length;
   };
 
   const handleLogin = (e?: React.SyntheticEvent) => {
@@ -390,12 +397,12 @@ export default function VisbackDashboard() {
 
   const agregarProductoAdmin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!nuevoProdNombre || !nuevoProdPrecio) {
-      alert("Rellena el nombre y el precio del producto.");
+    if (!nuevoProdId || !nuevoProdNombre || !nuevoProdPrecio) {
+      alert("Rellena el ID del producto (ej. disney), nombre y precio.");
       return;
     }
     const nuevoProducto: Producto = {
-      id: Date.now(),
+      id: nuevoProdId.trim().toLowerCase(),
       nombre: nuevoProdNombre,
       desc: nuevoProdDesc || 'Servicio de streaming',
       precio: parseFloat(nuevoProdPrecio)
@@ -413,13 +420,14 @@ export default function VisbackDashboard() {
       console.error("Error al guardar producto en Sheets:", err);
     }
 
+    setNuevoProdId('');
     setNuevoProdNombre('');
     setNuevoProdDesc('');
     setNuevoProdPrecio('');
     alert("¡Producto agregado con éxito y guardado en Google Sheets!");
   };
 
-  const eliminarProducto = async (id: number) => {
+  const eliminarProducto = async (id: string) => {
     if (confirm("¿Estás seguro de eliminar este producto del catálogo y de Google Sheets?")) {
       setProductos(prev => prev.filter(p => p.id !== id));
       setInventarioCredenciales(prev => prev.filter(c => c.productoId !== id));
@@ -448,7 +456,7 @@ export default function VisbackDashboard() {
 
     const nuevaCred: CredencialInventario = {
       id: Date.now(),
-      productoId: Number(credProdId),
+      productoId: credProdId,
       correo: credCorreo,
       pass: credPass,
       pin: credPin || 'N/A',
@@ -497,7 +505,7 @@ export default function VisbackDashboard() {
 
         nuevasCredenciales.push({
           id: Date.now() + index,
-          productoId: Number(credProdId),
+          productoId: credProdId,
           correo,
           pass,
           pin,
@@ -558,7 +566,7 @@ export default function VisbackDashboard() {
     }
 
     const credencialDisponible = inventarioCredenciales.find(
-      c => Number(c.productoId) === Number(productoAConfirmar.id) && String(c.estado).trim().toLowerCase() === 'disponible'
+      c => String(c.productoId).trim().toLowerCase() === String(productoAConfirmar.id).trim().toLowerCase() && String(c.estado).trim().toLowerCase() === 'disponible'
     );
 
     if (!credencialDisponible) {
@@ -735,9 +743,14 @@ export default function VisbackDashboard() {
 
       <div className="flex-1 flex flex-col overflow-y-auto">
         <header className="bg-white border-b border-slate-200 px-6 py-4 flex justify-between items-center sticky top-0 z-30 shadow-sm">
-          <button onClick={() => setMenuAbierto(true)} className="bg-slate-950 text-white px-3 py-2.5 rounded-xl font-semibold text-sm flex items-center gap-2 cursor-pointer">
-            <Menu size={18} className="text-purple-400" /> Menú
-          </button>
+          <div className="flex items-center gap-3">
+            <button onClick={() => setMenuAbierto(true)} className="bg-slate-950 text-white px-3 py-2.5 rounded-xl font-semibold text-sm flex items-center gap-2 cursor-pointer">
+              <Menu size={18} className="text-purple-400" /> Menú
+            </button>
+            <button onClick={sincronizarConGoogleSheets} className="bg-purple-100 hover:bg-purple-200 text-purple-700 px-3 py-2 rounded-xl text-xs font-bold cursor-pointer transition-all">
+              🔄 Sincronizar Stock
+            </button>
+          </div>
           <div className="flex items-center gap-3">
             <span className="bg-purple-50 border border-purple-200 text-purple-700 px-3 py-1.5 rounded-xl font-bold text-sm">
               ${usuarioActual?.saldo.toFixed(2) || '0.00'} MXN
@@ -752,8 +765,8 @@ export default function VisbackDashboard() {
           {activeTab === 'admin' && usuarioActual?.rol === 'admin' && (
             <div className="space-y-6">
               <div className="bg-gradient-to-r from-amber-600 to-orange-700 rounded-3xl p-6 text-white shadow-xl">
-                <h3 className="text-2xl font-bold">Panel de Administración 🛡️ (Sincronizado a Google Sheets)</h3>
-                <p className="text-amber-100 text-sm mt-1">Controla productos, stock, clientes y saldos 100% en la nube.</p>
+                <h3 className="text-2xl font-bold">Panel de Administración 🛡️ (IDs Claros)</h3>
+                <p className="text-amber-100 text-sm mt-1">Controla productos por ID y agrupa stock sin errores.</p>
               </div>
 
               {/* Agregar nuevo servicio */}
@@ -761,11 +774,12 @@ export default function VisbackDashboard() {
                 <h4 className="font-bold text-lg text-slate-800 flex items-center gap-2">
                   <PlusCircle size={20} className="text-purple-600" /> Agregar Nuevo Servicio al Catálogo
                 </h4>
-                <form onSubmit={agregarProductoAdmin} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <input type="text" placeholder="Nombre del servicio (Ej. Disney+ 1M)" value={nuevoProdNombre} onChange={e => setNuevoProdNombre(e.target.value)} className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm" />
-                  <input type="text" placeholder="Descripción (Ej. Respetar dispositivo)" value={nuevoProdDesc} onChange={e => setNuevoProdDesc(e.target.value)} className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm" />
-                  <input type="number" placeholder="Precio ($ MXN)" value={nuevoProdPrecio} onChange={e => setNuevoProdPrecio(e.target.value)} className="sm:col-span-2 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm" />
-                  <button type="submit" className="sm:col-span-2 bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 rounded-xl text-sm cursor-pointer transition-all shadow-md shadow-purple-600/20">
+                <form onSubmit={agregarProductoAdmin} className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <input type="text" placeholder="ID único (ej. disney)" value={nuevoProdId} onChange={e => setNuevoProdId(e.target.value)} className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-mono" />
+                  <input type="text" placeholder="Nombre (ej. Disney+ 1M)" value={nuevoProdNombre} onChange={e => setNuevoProdNombre(e.target.value)} className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm" />
+                  <input type="number" placeholder="Precio ($ MXN)" value={nuevoProdPrecio} onChange={e => setNuevoProdPrecio(e.target.value)} className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm" />
+                  <input type="text" placeholder="Descripción (ej. Respetar dispositivo)" value={nuevoProdDesc} onChange={e => setNuevoProdDesc(e.target.value)} className="sm:col-span-3 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm" />
+                  <button type="submit" className="sm:col-span-3 bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 rounded-xl text-sm cursor-pointer transition-all shadow-md shadow-purple-600/20">
                     Publicar Producto en la Tienda y Google Sheets
                   </button>
                 </form>
@@ -779,11 +793,11 @@ export default function VisbackDashboard() {
                 <form onSubmit={agregarCredencialInventario} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                   <select 
                     value={credProdId} 
-                    onChange={e => setCredProdId(Number(e.target.value))} 
-                    className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm"
+                    onChange={e => setCredProdId(e.target.value)} 
+                    className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold"
                   >
                     {productos.map(p => (
-                      <option key={p.id} value={Number(p.id)}>{p.nombre} (Stock: {obtenerStock(p.id)})</option>
+                      <option key={p.id} value={p.id}>{p.nombre} (Stock: {obtenerStock(p.id)})</option>
                     ))}
                   </select>
                   <input type="text" placeholder="Correo de la cuenta" value={credCorreo} onChange={e => setCredCorreo(e.target.value)} className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm" />
@@ -798,26 +812,23 @@ export default function VisbackDashboard() {
               {/* Carga Masiva */}
               <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
                 <h4 className="font-bold text-lg text-slate-800 flex items-center gap-2 text-purple-700">
-                  <KeyRound size={20} /> Carga Masiva de Credenciales (Suma Stock Automático)
+                  <KeyRound size={20} /> Carga Masiva de Credenciales
                 </h4>
-                <p className="text-slate-500 text-xs">
-                  Pega tu lista de cuentas completa. Cada línea representa una cuenta con formato: <code className="bg-slate-100 px-1 py-0.5 rounded text-purple-600 font-bold">correo pass pin</code>.
-                </p>
                 <form onSubmit={agregarCredencialMasiva} className="space-y-4">
                   <div className="max-w-xs">
                     <label className="block text-xs font-bold text-slate-700 mb-1">Seleccionar Servicio Destino:</label>
                     <select 
                       value={credProdId} 
-                      onChange={e => setCredProdId(Number(e.target.value))} 
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm"
+                      onChange={e => setCredProdId(e.target.value)} 
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold"
                     >
                       {productos.map(p => (
-                        <option key={p.id} value={Number(p.id)}>{p.nombre} (Stock actual: {obtenerStock(p.id)})</option>
+                        <option key={p.id} value={p.id}>{p.nombre} (Stock actual: {obtenerStock(p.id)})</option>
                       ))}
                     </select>
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">Lista de Cuentas (Una por renglón):</label>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Lista de Cuentas (Una por renglón: correo pass pin):</label>
                     <textarea 
                       rows={5}
                       placeholder="cuenta1@gmail.com pass123 1111&#10;cuenta2@gmail.com pass456 2222"
@@ -841,7 +852,7 @@ export default function VisbackDashboard() {
                   <table className="w-full text-left text-sm">
                     <thead>
                       <tr className="bg-slate-50 text-slate-500 font-bold uppercase border-b">
-                        <th className="p-3">Servicio</th>
+                        <th className="p-3">ID Servicio</th>
                         <th className="p-3">Correo / Pass / PIN</th>
                         <th className="p-3">Estado</th>
                         <th className="p-3 text-center">Acción</th>
@@ -849,10 +860,10 @@ export default function VisbackDashboard() {
                     </thead>
                     <tbody className="divide-y">
                       {inventarioCredenciales.map(c => {
-                        const prod = productos.find(p => Number(p.id) === Number(c.productoId));
+                        const prod = productos.find(p => p.id === c.productoId);
                         return (
                           <tr key={c.id}>
-                            <td className="p-3 font-semibold">{prod ? prod.nombre : `Desconocido (ID: ${c.productoId})`}</td>
+                            <td className="p-3 font-semibold font-mono text-purple-700">{prod ? prod.nombre : c.productoId}</td>
                             <td className="p-3 font-mono text-xs">{c.correo} / {c.pass} / {c.pin}</td>
                             <td className="p-3">
                               <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${c.estado === 'disponible' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
@@ -872,89 +883,7 @@ export default function VisbackDashboard() {
                 </div>
               </div>
 
-              {/* Agregar Cliente Manual */}
-              <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-                <h4 className="font-bold text-lg text-slate-800 flex items-center gap-2">
-                  <UserPlus size={20} className="text-amber-600" /> Registrar Cliente Oficial (Sincroniza a Google Sheets)
-                </h4>
-                <form onSubmit={agregarClienteAdmin} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                  <input type="text" placeholder="Nombre del cliente" value={adminNuevoNombre} onChange={e => setAdminNuevoNombre(e.target.value)} className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm" />
-                  <input type="email" placeholder="Correo electrónico" value={adminNuevoEmail} onChange={e => setAdminNuevoEmail(e.target.value)} className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm" />
-                  <input type="password" placeholder="Contraseña" value={adminNuevoPass} onChange={e => setAdminNuevoPass(e.target.value)} className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm" />
-                  <select value={adminNuevoEstado} onChange={e => setAdminNuevoEstado(e.target.value as 'activo' | 'pendiente')} className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm">
-                    <option value="activo">Estado: Activo</option>
-                    <option value="pendiente">Estado: Pendiente</option>
-                  </select>
-                  <button type="submit" className="sm:col-span-2 lg:col-span-4 bg-amber-600 hover:bg-amber-700 text-white font-bold py-3 rounded-xl text-sm cursor-pointer transition-all shadow-md shadow-amber-600/25">
-                    Crear Cuenta de Cliente en la Nube
-                  </button>
-                </form>
-              </div>
-
-              {/* Clientes y Ajuste de Saldos */}
-              <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-                <h4 className="font-bold text-lg text-slate-800 flex items-center gap-2">
-                  <Users size={20} className="text-amber-600" /> Clientes y Gestión de Saldo ({usuariosRegistrados.length})
-                </h4>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-sm">
-                    <thead>
-                      <tr className="bg-slate-50 text-slate-500 font-bold uppercase border-b">
-                        <th className="p-3">Nombre</th>
-                        <th className="p-3">Correo</th>
-                        <th className="p-3">Saldo Actual</th>
-                        <th className="p-3">Estado</th>
-                        <th className="p-3 text-center">Ajustar Saldo ($ MXN)</th>
-                        <th className="p-3 text-center">Acción Cuenta</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y">
-                      {usuariosRegistrados.map((u, i) => (
-                        <tr key={i}>
-                          <td className="p-3 font-semibold">{u.nombre}</td>
-                          <td className="p-3 text-slate-600 font-mono text-xs">{u.email}</td>
-                          <td className="p-3 font-bold text-purple-600">${u.saldo.toFixed(2)}</td>
-                          <td className="p-3"><span className={`px-2 py-0.5 rounded-full text-xs font-bold ${u.estado === 'activo' ? 'bg-emerald-100 text-emerald-700' : 'bg-yellow-100 text-yellow-800'}`}>{u.estado}</span></td>
-                          <td className="p-3">
-                            <div className="flex items-center justify-center gap-1.5">
-                              <input 
-                                type="number" 
-                                placeholder="Monto" 
-                                value={cantidadesRecarga[u.email] || ''} 
-                                onChange={(e) => setCantidadesRecarga({ ...cantidadesRecarga, [u.email]: e.target.value })} 
-                                className="w-20 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-xs" 
-                              />
-                              <button 
-                                onClick={() => ajustarSaldoUsuario(u.email, 'agregar')} 
-                                className="bg-emerald-600 hover:bg-emerald-700 text-white px-2 py-1 rounded-lg text-xs font-bold cursor-pointer"
-                                title="Agregar saldo"
-                              >
-                                + Agregar
-                              </button>
-                              <button 
-                                onClick={() => ajustarSaldoUsuario(u.email, 'quitar')} 
-                                className="bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded-lg text-xs font-bold cursor-pointer"
-                                title="Quitar saldo"
-                              >
-                                - Quitar
-                              </button>
-                            </div>
-                          </td>
-                          <td className="p-3 text-center">
-                            {u.email !== 'admin@visback.com' && (
-                              <button onClick={() => eliminarUsuario(u.email)} className="bg-red-100 text-red-600 hover:bg-red-200 px-3 py-1 rounded-lg text-xs font-bold cursor-pointer transition-all flex items-center gap-1 mx-auto">
-                                <Trash2 size={14} /> Eliminar
-                              </button>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              {/* Productos en Catálogo */}
+              {/* Clientes y Productos */}
               <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
                 <h4 className="font-bold text-lg text-slate-800 flex items-center gap-2">
                   <ShoppingBag size={20} className="text-purple-600" /> Productos en el Catálogo ({productos.length})
@@ -963,15 +892,17 @@ export default function VisbackDashboard() {
                   <table className="w-full text-left text-sm">
                     <thead>
                       <tr className="bg-slate-50 text-slate-500 font-bold uppercase border-b">
+                        <th className="p-3">ID</th>
                         <th className="p-3">Servicio</th>
                         <th className="p-3">Precio</th>
-                        <th className="p-3">Stock Automático</th>
+                        <th className="p-3">Stock Actual</th>
                         <th className="p-3 text-center">Acción</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y">
                       {productos.map(p => (
                         <tr key={p.id}>
+                          <td className="p-3 font-mono text-xs text-slate-500 font-bold">{p.id}</td>
                           <td className="p-3 font-semibold">{p.nombre}</td>
                           <td className="p-3">${p.precio.toFixed(2)}</td>
                           <td className="p-3"><span className="bg-emerald-100 text-emerald-700 px-2.5 py-1 rounded-full font-bold text-xs">{obtenerStock(p.id)} disponibles</span></td>
