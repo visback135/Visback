@@ -143,6 +143,14 @@ export default function VisbackDashboard() {
     }
   }, [compras]);
 
+  const [credProdId, setCredProdId] = useState<number>(1);
+
+  useEffect(() => {
+    if (productos.length > 0 && (credProdId === 1 || !productos.some(p => p.id === credProdId))) {
+      setCredProdId(productos[0].id);
+    }
+  }, [productos]);
+
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const savedUser = localStorage.getItem('visback_usuario_actual');
@@ -184,6 +192,7 @@ export default function VisbackDashboard() {
             precio: Number(p.precio) || 0
           }));
           setProductos(formP);
+          if (formP.length > 0) setCredProdId(formP[0].id);
         }
 
         if (data.inventario && Array.isArray(data.inventario) && data.inventario.length > 0) {
@@ -212,7 +221,6 @@ export default function VisbackDashboard() {
   const [nuevoProdDesc, setNuevoProdDesc] = useState('');
   const [nuevoProdPrecio, setNuevoProdPrecio] = useState('');
 
-  const [credProdId, setCredProdId] = useState<number>(1);
   const [credCorreo, setCredCorreo] = useState('');
   const [credPass, setCredPass] = useState('');
   const [credPin, setCredPin] = useState('');
@@ -512,8 +520,23 @@ export default function VisbackDashboard() {
     alert(`¡Se agregaron ${agregadas} cuentas al inventario!`);
   };
 
-  const eliminarCredencial = (id: number) => {
-    setInventarioCredenciales(prev => prev.filter(c => c.id !== id));
+  const eliminarCredencial = async (id: number) => {
+    if (confirm("¿Estás seguro de eliminar esta credencial del inventario y de Google Sheets?")) {
+      setInventarioCredenciales(prev => prev.filter(c => c.id !== id));
+
+      try {
+        await fetch(GOOGLE_SHEET_URL, {
+          method: 'POST',
+          mode: 'no-cors',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'delete_credencial', id: id })
+        });
+      } catch (err) {
+        console.error("Error al eliminar credencial en Sheets:", err);
+      }
+
+      alert("Credencial eliminada con éxito.");
+    }
   };
 
   const ejecutarCompraFinal = async () => {
@@ -749,7 +772,7 @@ export default function VisbackDashboard() {
                     className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm"
                   >
                     {productos.map(p => (
-                      <option key={p.id} value={p.id}>{p.nombre} (Stock: {obtenerStock(p.id)})</option>
+                      <option key={p.id} value={Number(p.id)}>{p.nombre} (Stock: {obtenerStock(p.id)})</option>
                     ))}
                   </select>
                   <input type="text" placeholder="Correo de la cuenta" value={credCorreo} onChange={e => setCredCorreo(e.target.value)} className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm" />
@@ -778,7 +801,7 @@ export default function VisbackDashboard() {
                       className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm"
                     >
                       {productos.map(p => (
-                        <option key={p.id} value={p.id}>{p.nombre} (Stock actual: {obtenerStock(p.id)})</option>
+                        <option key={p.id} value={Number(p.id)}>{p.nombre} (Stock actual: {obtenerStock(p.id)})</option>
                       ))}
                     </select>
                   </div>
