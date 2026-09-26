@@ -12,10 +12,11 @@ import {
   CheckCircle2,
   Users,
   PlusCircle,
-  UserPlus,
   KeyRound,
   Clock,
-  Trash2
+  Trash2,
+  RefreshCw,
+  UserPlus
 } from 'lucide-react';
 
 interface Producto {
@@ -71,59 +72,17 @@ export default function VisbackDashboard() {
   const [adminNuevoPass, setAdminNuevoPass] = useState('');
   const [adminNuevoEstado, setAdminNuevoEstado] = useState<'activo' | 'pendiente'>('activo');
 
-  // ESTADOS DECLARADOS PRIMERO (Evita el error de "used before its declaration")
   const [usuarioActual, setUsuarioActual] = useState<Usuario | null>(null);
   const [activeTab, setActiveTab] = useState<'inicio' | 'compras' | 'billetera' | 'admin'>('inicio');
   const [menuAbierto, setMenuAbierto] = useState(false);
 
-  const [usuariosRegistrados, setUsuariosRegistrados] = useState<Usuario[]>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('visback_usuarios_db');
-      if (saved) {
-        try { return JSON.parse(saved); } catch (e) { console.error(e); }
-      }
-    }
-    return [
-      { email: 'admin@visback.com', pass: 'admin123', nombre: 'Administrador', rol: 'admin', estado: 'activo', saldo: 500.00 },
-      { email: 'cliente@visback.com', pass: '123456', nombre: 'Brandon Beltran', rol: 'cliente', estado: 'activo', saldo: 125.00 }
-    ];
-  });
-
-  const [productos, setProductos] = useState<Producto[]>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('visback_prods_db');
-      if (saved) {
-        try { return JSON.parse(saved); } catch (e) { console.error(e); }
-      }
-    }
-    return [
-      { id: 'netflix', nombre: 'Netflix Perfil 1M', desc: 'Respetar 1 Dispositivo', precio: 45.00 },
-      { id: 'crunchyroll', nombre: 'Crunchyroll Fan 1M', desc: 'Cuenta Completa 1 Mes', precio: 38.00 },
-      { id: 'max', nombre: 'Max Perfil 1M', desc: 'Respetar 1 Dispositivo', precio: 9.00 },
-      { id: 'vix', nombre: 'ViX Premium 1M', desc: 'Premium 5 Perfiles', precio: 10.00 },
-      { id: 'disney', nombre: 'Disney+ 1M', desc: 'Respetar 1 Dispositivo', precio: 20.00 },
-    ];
-  });
-
-  const [inventarioCredenciales, setInventarioCredenciales] = useState<CredencialInventario[]>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('visback_inv_db');
-      if (saved) {
-        try { return JSON.parse(saved); } catch (e) { console.error(e); }
-      }
-    }
-    return [];
-  });
-
-  const [compras, setCompras] = useState<Compra[]>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('visback_compras_db');
-      if (saved) {
-        try { return JSON.parse(saved); } catch (e) { console.error(e); }
-      }
-    }
-    return [];
-  });
+  const [usuariosRegistrados, setUsuariosRegistrados] = useState<Usuario[]>([]);
+  const [productos, setProductos] = useState<Producto[]>([
+    { id: 'netflix', nombre: 'Netflix Perfil 1M', desc: 'Respetar 1 Dispositivo', precio: 55.00 },
+    { id: 'disney', nombre: 'Disney+ 1M', desc: 'Respetar 1 Dispositivo', precio: 20.00 }
+  ]);
+  const [inventarioCredenciales, setInventarioCredenciales] = useState<CredencialInventario[]>([]);
+  const [compras, setCompras] = useState<Compra[]>([]);
 
   const [productoAConfirmar, setProductoAConfirmar] = useState<Producto | null>(null);
   const [compraExitosa, setCompraExitosa] = useState<Compra | null>(null);
@@ -142,55 +101,10 @@ export default function VisbackDashboard() {
   const [cantidadesRecarga, setCantidadesRecarga] = useState<{ [key: string]: string }>({});
   const whatsappNumber = "5217734092937";
 
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('visback_usuarios_db', JSON.stringify(usuariosRegistrados));
-    }
-  }, [usuariosRegistrados]);
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('visback_prods_db', JSON.stringify(productos));
-    }
-  }, [productos]);
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('visback_inv_db', JSON.stringify(inventarioCredenciales));
-    }
-  }, [inventarioCredenciales]);
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('visback_compras_db', JSON.stringify(compras));
-    }
-  }, [compras]);
-
-  useEffect(() => {
-    if (productos.length > 0 && !productos.some(p => p.id === credProdId)) {
-      setCredProdId(productos[0].id);
-    }
-  }, [productos, credProdId]);
-
   const sincronizarConGoogleSheets = () => {
     fetch(GOOGLE_SHEET_URL + "?t=" + Date.now())
       .then(res => res.json())
       .then((data: any) => {
-        if (data.usuarios && Array.isArray(data.usuarios) && data.usuarios.length > 0) {
-          const formU: Usuario[] = data.usuarios.map((u: any) => ({
-            email: String(u.email || '').trim(),
-            pass: String(u.pass || '').trim(),
-            nombre: String(u.nombre || '').trim(),
-            rol: (String(u.rol).trim() === 'admin' ? 'admin' : 'cliente'),
-            estado: (String(u.estado).trim() === 'pendiente' ? 'pendiente' : 'activo'),
-            saldo: Number(u.saldo) || 0
-          }));
-          if (!formU.some(u => u.email === 'admin@visback.com')) {
-            formU.unshift({ email: 'admin@visback.com', pass: 'admin123', nombre: 'Administrador', rol: 'admin', estado: 'activo', saldo: 500.00 });
-          }
-          setUsuariosRegistrados(formU);
-        }
-
         if (data.productos && Array.isArray(data.productos) && data.productos.length > 0) {
           const formP: Producto[] = data.productos.map((p: any) => ({
             id: String(p.id || '').trim().toLowerCase(),
@@ -207,16 +121,31 @@ export default function VisbackDashboard() {
         if (data.inventario && Array.isArray(data.inventario)) {
           const formI: CredencialInventario[] = data.inventario.map((i: any) => ({
             id: Number(i.id) || Date.now(),
-            productoId: String(i.productoId || '').trim().toLowerCase(),
+            productoId: String(i.productoid || i.productoId || '').trim().toLowerCase(),
             correo: String(i.correo || '').trim(),
             pass: String(i.pass || '').trim(),
             pin: String(i.pin || 'N/A').trim(),
-            estado: (String(i.estado).trim().toLowerCase() === 'vendida' ? 'vendida' : 'disponible')
-          })).filter((i: any) => i.productoId && i.productoId !== '0' && i.productoId !== 'desconocido');
+            estado: (String(i.estado || '').trim().toLowerCase() === 'vendida' ? 'vendida' : 'disponible')
+          })).filter((i: any) => i.productoId && i.productoId !== '0');
           setInventarioCredenciales(formI);
         }
+
+        if (data.usuarios && Array.isArray(data.usuarios)) {
+          const formU: Usuario[] = data.usuarios.map((u: any) => ({
+            email: String(u.email || '').trim(),
+            pass: String(u.pass || '').trim(),
+            nombre: String(u.nombre || '').trim(),
+            rol: (String(u.rol || '').trim() === 'admin' ? 'admin' : 'cliente'),
+            estado: (String(u.estado || '').trim() === 'pendiente' ? 'pendiente' : 'activo'),
+            saldo: Number(u.saldo) || 0
+          }));
+          if (!formU.some(u => u.email === 'admin@visback.com')) {
+            formU.unshift({ email: 'admin@visback.com', pass: 'admin123', nombre: 'Administrador', rol: 'admin', estado: 'activo', saldo: 500.00 });
+          }
+          setUsuariosRegistrados(formU);
+        }
       })
-      .catch((err: any) => console.error("Aviso: Usando respaldo local", err));
+      .catch((err: any) => console.error("Error al sincronizar:", err));
   };
 
   useEffect(() => {
@@ -258,13 +187,13 @@ export default function VisbackDashboard() {
 
     const encontrado = usuariosRegistrados.find(
       u => u.email.toLowerCase() === emailVal.toLowerCase() && u.pass === passVal
-    );
+    ) || (emailVal === 'admin@visback.com' && passVal === 'admin123' ? { email: 'admin@visback.com', pass: 'admin123', nombre: 'Administrador', rol: 'admin', estado: 'activo', saldo: 500 } : null);
 
     if (!encontrado) {
       alert(`Acceso denegado. Correo o contraseña incorrectos.`);
       return;
     }
-    setUsuarioActual(encontrado);
+    setUsuarioActual(encontrado as Usuario);
     setViewMode('app');
     setActiveTab(encontrado.rol === 'admin' ? 'admin' : 'inicio');
 
@@ -280,9 +209,8 @@ export default function VisbackDashboard() {
       return;
     }
 
-    const mensaje = encodeURIComponent(`Hola Visback Stream, me quiero registrar. \n\nNombre: ${regNombre}\nCorreo deseado: ${regEmail}\nContraseña deseada: ${regPassword}\n\nSolicito la creación y activación de mi cuenta.`);
+    const mensaje = encodeURIComponent(`Hola Visback Stream, me quiero registrar.\n\nNombre: ${regNombre}\nCorreo: ${regEmail}\nContraseña: ${regPassword}`);
     window.open(`https://wa.me/${whatsappNumber}?text=${mensaje}`, '_blank');
-
     setRegNombre('');
     setRegEmail('');
     setRegPassword('');
@@ -292,14 +220,9 @@ export default function VisbackDashboard() {
   const agregarClienteAdmin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!adminNuevoNombre || !adminNuevoEmail || !adminNuevoPass) {
-      alert("Por favor completa el nombre, correo y contraseña del cliente.");
+      alert("Completa todos los campos del cliente.");
       return;
     }
-    if (usuariosRegistrados.some(u => u.email.toLowerCase() === adminNuevoEmail.toLowerCase())) {
-      alert("Ya existe un usuario registrado con este correo.");
-      return;
-    }
-
     const nuevoCliente: Usuario = {
       email: adminNuevoEmail,
       pass: adminNuevoPass,
@@ -308,25 +231,19 @@ export default function VisbackDashboard() {
       estado: adminNuevoEstado,
       saldo: 0.00
     };
-
     setUsuariosRegistrados(prev => [...prev, nuevoCliente]);
-
     try {
       await fetch(GOOGLE_SHEET_URL, {
         method: 'POST',
         mode: 'no-cors',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'add', ...nuevoCliente })
+        body: JSON.stringify({ action: 'add_usuario', ...nuevoCliente })
       });
-    } catch (err) {
-      console.error(err);
-    }
-
+    } catch (err) { console.error(err); }
     setAdminNuevoNombre('');
     setAdminNuevoEmail('');
     setAdminNuevoPass('');
-    setAdminNuevoEstado('activo');
-    alert(`¡Cliente ${nuevoCliente.nombre} creado con éxito y guardado en Google Sheets!`);
+    alert("¡Cliente agregado con éxito!");
   };
 
   const eliminarUsuario = async (email: string) => {
@@ -334,19 +251,16 @@ export default function VisbackDashboard() {
       alert("No se puede eliminar al administrador principal.");
       return;
     }
-    if (confirm(`¿Estás seguro de eliminar al usuario ${email}?`)) {
+    if (confirm(`¿Eliminar al usuario ${email}?`)) {
       setUsuariosRegistrados(prev => prev.filter(u => u.email !== email));
-
       try {
         await fetch(GOOGLE_SHEET_URL, {
           method: 'POST',
           mode: 'no-cors',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'delete', email })
+          body: JSON.stringify({ action: 'delete_usuario', email })
         });
-      } catch (err) {
-        console.error(err);
-      }
+      } catch (err) { console.error(err); }
     }
   };
 
@@ -357,48 +271,38 @@ export default function VisbackDashboard() {
       alert("Ingresa una cantidad válida de saldo.");
       return;
     }
-
     let saldoFinalCalculado = 0;
-
     const usuariosActualizados = usuariosRegistrados.map(u => {
       if (u.email === email) {
         let nuevoSaldo = tipo === 'agregar' ? u.saldo + monto : u.saldo - monto;
         if (nuevoSaldo < 0) nuevoSaldo = 0;
         saldoFinalCalculado = nuevoSaldo;
-
         if (usuarioActual?.email === email) {
           const actualizado = { ...u, saldo: nuevoSaldo };
           setUsuarioActual(actualizado);
-          if (typeof window !== 'undefined') {
-            localStorage.setItem('visback_usuario_actual', JSON.stringify(actualizado));
-          }
+          localStorage.setItem('visback_usuario_actual', JSON.stringify(actualizado));
         }
         return { ...u, saldo: nuevoSaldo };
       }
       return u;
     });
-
     setUsuariosRegistrados(usuariosActualizados);
-
     try {
       await fetch(GOOGLE_SHEET_URL, {
         method: 'POST',
         mode: 'no-cors',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'update_saldo', email: email, saldo: saldoFinalCalculado })
+        body: JSON.stringify({ action: 'update_saldo', email, saldo: saldoFinalCalculado })
       });
-    } catch (err) {
-      console.error("Error al actualizar saldo en Sheets:", err);
-    }
-
+    } catch (err) { console.error(err); }
     setCantidadesRecarga(prev => ({ ...prev, [email]: '' }));
-    alert(`¡Saldo actualizado con éxito y guardado en Google Sheets!`);
+    alert("¡Saldo actualizado con éxito!");
   };
 
   const agregarProductoAdmin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!nuevoProdId || !nuevoProdNombre || !nuevoProdPrecio) {
-      alert("Rellena el ID del producto (ej. disney), nombre y precio.");
+      alert("Rellena el ID, nombre y precio.");
       return;
     }
     const nuevoProducto: Producto = {
@@ -408,7 +312,6 @@ export default function VisbackDashboard() {
       precio: parseFloat(nuevoProdPrecio)
     };
     setProductos(prev => [...prev, nuevoProducto]);
-
     try {
       await fetch(GOOGLE_SHEET_URL, {
         method: 'POST',
@@ -416,55 +319,43 @@ export default function VisbackDashboard() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'add_producto', ...nuevoProducto })
       });
-    } catch (err) {
-      console.error("Error al guardar producto en Sheets:", err);
-    }
-
+    } catch (err) { console.error(err); }
     setNuevoProdId('');
     setNuevoProdNombre('');
     setNuevoProdDesc('');
     setNuevoProdPrecio('');
-    alert("¡Producto agregado con éxito y guardado en Google Sheets!");
+    alert("¡Producto agregado con éxito!");
   };
 
   const eliminarProducto = async (id: string) => {
-    if (confirm("¿Estás seguro de eliminar este producto del catálogo y de Google Sheets?")) {
+    if (confirm("¿Eliminar este producto?")) {
       setProductos(prev => prev.filter(p => p.id !== id));
-      setInventarioCredenciales(prev => prev.filter(c => c.productoId !== id));
-
       try {
         await fetch(GOOGLE_SHEET_URL, {
           method: 'POST',
           mode: 'no-cors',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'delete_producto', id: id })
+          body: JSON.stringify({ action: 'delete_producto', id })
         });
-      } catch (err) {
-        console.error("Error al eliminar producto en Sheets:", err);
-      }
-
-      alert("Producto eliminado con éxito.");
+      } catch (err) { console.error(err); }
     }
   };
 
   const agregarCredencialInventario = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!credCorreo || !credPass) {
-      alert("Ingresa al menos el correo y la contraseña.");
+      alert("Ingresa correo y contraseña.");
       return;
     }
-
     const nuevaCred: CredencialInventario = {
       id: Date.now(),
-      productoId: credProdId,
+      productoId: String(credProdId).trim().toLowerCase(),
       correo: credCorreo,
       pass: credPass,
       pin: credPin || 'N/A',
       estado: 'disponible'
     };
-
     setInventarioCredenciales(prev => [...prev, nuevaCred]);
-
     try {
       await fetch(GOOGLE_SHEET_URL, {
         method: 'POST',
@@ -472,14 +363,12 @@ export default function VisbackDashboard() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'add_credencial', ...nuevaCred })
       });
-    } catch (err) {
-      console.error(err);
-    }
-
+    } catch (err) { console.error(err); }
     setCredCorreo('');
     setCredPass('');
     setCredPin('');
     alert("¡Credencial agregada al inventario!");
+    setTimeout(sincronizarConGoogleSheets, 1000);
   };
 
   const agregarCredencialMasiva = async (e: React.FormEvent) => {
@@ -488,41 +377,31 @@ export default function VisbackDashboard() {
       alert("Pega al menos una credencial.");
       return;
     }
-
     const lineas = textoMasivo.split('\n');
     let agregadas = 0;
-    const nuevasCredenciales: CredencialInventario[] = [];
-
+    const nuevasCreds: CredencialInventario[] = [];
     lineas.forEach((linea, index) => {
       const limpia = linea.trim();
       if (!limpia) return;
-
       const partes = limpia.split(/[,|\s]+/);
       if (partes.length >= 2) {
-        const correo = partes[0];
-        const pass = partes[1];
-        const pin = partes[2] || 'N/A';
-
-        nuevasCredenciales.push({
+        nuevasCreds.push({
           id: Date.now() + index,
-          productoId: credProdId,
-          correo,
-          pass,
-          pin,
+          productoId: String(credProdId).trim().toLowerCase(),
+          correo: partes[0],
+          pass: partes[1],
+          pin: partes[2] || 'N/A',
           estado: 'disponible'
         });
         agregadas++;
       }
     });
-
     if (agregadas === 0) {
       alert("Formato no válido.");
       return;
     }
-
-    setInventarioCredenciales(prev => [...prev, ...nuevasCredenciales]);
-
-    for (const cred of nuevasCredenciales) {
+    setInventarioCredenciales(prev => [...prev, ...nuevasCreds]);
+    for (const cred of nuevasCreds) {
       try {
         await fetch(GOOGLE_SHEET_URL, {
           method: 'POST',
@@ -530,31 +409,24 @@ export default function VisbackDashboard() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ action: 'add_credencial', ...cred })
         });
-      } catch (err) {
-        console.error(err);
-      }
+      } catch (err) { console.error(err); }
     }
-
     setTextoMasivo('');
-    alert(`¡Se agregaron ${agregadas} cuentas al inventario!`);
+    alert(`¡Se agregaron ${agregadas} cuentas masivamente!`);
+    setTimeout(sincronizarConGoogleSheets, 1500);
   };
 
   const eliminarCredencial = async (id: number) => {
-    if (confirm("¿Estás seguro de eliminar esta credencial del inventario y de Google Sheets?")) {
+    if (confirm("¿Eliminar esta credencial?")) {
       setInventarioCredenciales(prev => prev.filter(c => c.id !== id));
-
       try {
         await fetch(GOOGLE_SHEET_URL, {
           method: 'POST',
           mode: 'no-cors',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'delete_credencial', id: id })
+          body: JSON.stringify({ action: 'delete_credencial', id })
         });
-      } catch (err) {
-        console.error("Error al eliminar credencial en Sheets:", err);
-      }
-
-      alert("Credencial eliminada con éxito.");
+      } catch (err) { console.error(err); }
     }
   };
 
@@ -564,21 +436,17 @@ export default function VisbackDashboard() {
       alert("Saldo insuficiente.");
       return;
     }
-
     const credencialDisponible = inventarioCredenciales.find(
       c => String(c.productoId).trim().toLowerCase() === String(productoAConfirmar.id).trim().toLowerCase() && String(c.estado).trim().toLowerCase() === 'disponible'
     );
-
     if (!credencialDisponible) {
-      alert("Lo sentimos, este producto se ha quedado sin stock disponible.");
+      alert("Sin stock disponible.");
       setProductoAConfirmar(null);
       return;
     }
-
     setInventarioCredenciales(prev => prev.map(c => 
       c.id === credencialDisponible.id ? { ...c, estado: 'vendida' } : c
     ));
-
     try {
       await fetch(GOOGLE_SHEET_URL, {
         method: 'POST',
@@ -586,20 +454,13 @@ export default function VisbackDashboard() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'vender_credencial', id: credencialDisponible.id })
       });
-    } catch (err) {
-      console.error(err);
-    }
+    } catch (err) { console.error(err); }
 
     const nuevoSaldo = usuarioActual.saldo - productoAConfirmar.precio;
-    const usuarioActualizado = { ...usuarioActual, saldo: nuevoSaldo };
-    setUsuarioActual(usuarioActualizado);
-    
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('visback_usuario_actual', JSON.stringify(usuarioActualizado));
-    }
-
+    const actualizado = { ...usuarioActual, saldo: nuevoSaldo };
+    setUsuarioActual(actualizado);
+    localStorage.setItem('visback_usuario_actual', JSON.stringify(actualizado));
     setUsuariosRegistrados(prev => prev.map(u => u.email === usuarioActual.email ? { ...u, saldo: nuevoSaldo } : u));
-
     try {
       await fetch(GOOGLE_SHEET_URL, {
         method: 'POST',
@@ -607,9 +468,7 @@ export default function VisbackDashboard() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'update_saldo', email: usuarioActual.email, saldo: nuevoSaldo })
       });
-    } catch (err) {
-      console.error(err);
-    }
+    } catch (err) { console.error(err); }
 
     const nuevaCompra: Compra = {
       id: `#${Math.floor(100000 + Math.random() * 900000)}`,
@@ -621,7 +480,6 @@ export default function VisbackDashboard() {
       vencimiento: '24/10/2026',
       estado: 'Activa'
     };
-
     setCompras(prev => [nuevaCompra, ...prev]);
     setProductoAConfirmar(null);
     setCompraExitosa(nuevaCompra);
@@ -629,44 +487,19 @@ export default function VisbackDashboard() {
 
   if (viewMode === 'login') {
     return (
-      <div className="flex min-h-screen w-full items-center justify-center bg-slate-950 p-4 py-8 font-sans overflow-y-auto">
-        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-8 max-w-md w-full shadow-2xl space-y-6 my-auto relative z-10">
+      <div className="flex min-h-screen w-full items-center justify-center bg-slate-950 p-4 font-sans">
+        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-8 max-w-md w-full shadow-2xl space-y-6">
           <div className="text-center space-y-2">
-            <div className="w-14 h-14 bg-purple-600 rounded-2xl flex items-center justify-center font-bold text-2xl text-white mx-auto shadow-lg shadow-purple-600/30">V</div>
+            <div className="w-14 h-14 bg-purple-600 rounded-2xl flex items-center justify-center font-bold text-2xl text-white mx-auto shadow-lg">V</div>
             <h1 className="text-2xl font-extrabold text-white">Visback Stream</h1>
-            <p className="text-slate-400 text-sm">Sincronizado con Google Sheets</p>
           </div>
-          <div className="space-y-4 relative z-20">
-            <input 
-              type="email" 
-              placeholder="Correo electrónico" 
-              ref={loginEmailRef}
-              defaultValue=""
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-purple-500" 
-            />
-            <input 
-              type="password" 
-              placeholder="Contraseña" 
-              ref={loginPasswordRef}
-              defaultValue=""
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-purple-500" 
-            />
-            <button 
-              type="button"
-              onClick={() => handleLogin()}
-              className="w-full block bg-purple-600 text-white font-bold py-3.5 rounded-xl text-sm text-center cursor-pointer hover:bg-purple-700 active:bg-purple-800 transition-all shadow-lg shadow-purple-600/30"
-            >
-              Entrar
-            </button>
+          <div className="space-y-4">
+            <input type="email" placeholder="Correo electrónico" ref={loginEmailRef} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-purple-500" />
+            <input type="password" placeholder="Contraseña" ref={loginPasswordRef} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-purple-500" />
+            <button type="button" onClick={() => handleLogin()} className="w-full bg-purple-600 text-white font-bold py-3.5 rounded-xl text-sm shadow-lg hover:bg-purple-700 transition-all cursor-pointer">Entrar</button>
           </div>
-          <div className="text-center pt-4 border-t border-slate-800 relative z-20">
-            <button 
-              type="button"
-              onClick={() => setViewMode('register')}
-              className="w-full block py-3 px-4 bg-purple-600 text-white font-bold rounded-xl text-xs text-center cursor-pointer hover:bg-purple-700 transition-all shadow-md shadow-purple-600/30"
-            >
-              ¿No tienes cuenta? Solicítala por WhatsApp
-            </button>
+          <div className="text-center pt-2">
+            <button type="button" onClick={() => setViewMode('register')} className="text-purple-400 text-xs font-semibold hover:underline">¿No tienes cuenta? Solicítala por WhatsApp</button>
           </div>
         </div>
       </div>
@@ -675,29 +508,18 @@ export default function VisbackDashboard() {
 
   if (viewMode === 'register') {
     return (
-      <div className="flex min-h-screen w-full items-center justify-center bg-slate-950 p-4 py-12 font-sans overflow-y-auto">
-        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl space-y-6 my-auto mb-16">
-          <div className="text-center space-y-2">
-            <h1 className="text-2xl font-extrabold text-white">Solicitar Cuenta</h1>
-            <p className="text-slate-400 text-sm">Envía tus datos por WhatsApp para que el administrador te registre</p>
-          </div>
+      <div className="flex min-h-screen w-full items-center justify-center bg-slate-950 p-4 font-sans">
+        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-8 max-w-md w-full shadow-2xl space-y-6">
+          <h1 className="text-xl font-bold text-white text-center">Solicitar Cuenta</h1>
           <form onSubmit={handleRegisterWhatsAppOnly} className="space-y-4">
-            <input type="text" placeholder="Tu nombre completo" value={regNombre} onChange={e => setRegNombre(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-emerald-500" />
-            <input type="email" placeholder="Correo deseado" value={regEmail} onChange={e => setRegEmail(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-emerald-500" />
-            <input type="password" placeholder="Contraseña deseada" value={regPassword} onChange={e => setRegPassword(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-emerald-500" />
-            <button type="submit" className="w-full bg-emerald-600 text-white font-bold py-3.5 rounded-xl text-sm cursor-pointer hover:bg-emerald-700 transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/30">
+            <input type="text" placeholder="Tu nombre completo" value={regNombre} onChange={e => setRegNombre(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white text-sm" />
+            <input type="email" placeholder="Correo deseado" value={regEmail} onChange={e => setRegEmail(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white text-sm" />
+            <input type="password" placeholder="Contraseña deseada" value={regPassword} onChange={e => setRegPassword(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white text-sm" />
+            <button type="submit" className="w-full bg-emerald-600 text-white font-bold py-3 rounded-xl text-sm flex items-center justify-center gap-2 hover:bg-emerald-700 cursor-pointer">
               <MessageCircle size={18} /> Enviar Solicitud por WhatsApp
             </button>
           </form>
-          <div className="text-center pt-4 border-t border-slate-800">
-            <button 
-              type="button"
-              onClick={() => setViewMode('login')}
-              className="w-full py-2.5 px-4 bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold rounded-xl text-xs cursor-pointer transition-all border border-slate-700"
-            >
-              ¿Ya tienes cuenta? Volver al Login
-            </button>
-          </div>
+          <button onClick={() => setViewMode('login')} className="w-full text-slate-400 text-xs text-center hover:underline">Volver al Login</button>
         </div>
       </div>
     );
@@ -715,28 +537,22 @@ export default function VisbackDashboard() {
           </div>
           <nav className="space-y-2">
             {usuarioActual?.rol === 'admin' && (
-              <button onClick={() => { setActiveTab('admin'); setMenuAbierto(false); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium ${activeTab === 'admin' ? 'bg-amber-600 text-white shadow-lg shadow-amber-600/30' : 'text-slate-400 hover:bg-slate-900'}`}>
+              <button onClick={() => { setActiveTab('admin'); setMenuAbierto(false); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium ${activeTab === 'admin' ? 'bg-amber-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-900'}`}>
                 <Users size={20} /> Panel Admin
               </button>
             )}
-            <button onClick={() => { setActiveTab('inicio'); setMenuAbierto(false); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium ${activeTab === 'inicio' ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/30' : 'text-slate-400 hover:bg-slate-900'}`}>
+            <button onClick={() => { setActiveTab('inicio'); setMenuAbierto(false); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium ${activeTab === 'inicio' ? 'bg-purple-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-900'}`}>
               <ShoppingBag size={20} /> Catálogo
             </button>
-            <button onClick={() => { setActiveTab('compras'); setMenuAbierto(false); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium ${activeTab === 'compras' ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/30' : 'text-slate-400 hover:bg-slate-900'}`}>
+            <button onClick={() => { setActiveTab('compras'); setMenuAbierto(false); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium ${activeTab === 'compras' ? 'bg-purple-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-900'}`}>
               <ShoppingCart size={20} /> Mis Compras
             </button>
-            <button onClick={() => { setActiveTab('billetera'); setMenuAbierto(false); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium ${activeTab === 'billetera' ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/30' : 'text-slate-400 hover:bg-slate-900'}`}>
+            <button onClick={() => { setActiveTab('billetera'); setMenuAbierto(false); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium ${activeTab === 'billetera' ? 'bg-purple-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-900'}`}>
               <Wallet size={20} /> Billetera
             </button>
           </nav>
         </div>
-        <button onClick={() => { 
-          setUsuarioActual(null); 
-          setViewMode('login'); 
-          if (typeof window !== 'undefined') {
-            localStorage.removeItem('visback_usuario_actual');
-          }
-        }} className="w-full bg-red-600/10 text-red-500 hover:bg-red-600 hover:text-white py-3 rounded-xl font-semibold text-sm cursor-pointer transition-all flex items-center justify-center gap-2">
+        <button onClick={() => { setUsuarioActual(null); setViewMode('login'); localStorage.removeItem('visback_usuario_actual'); }} className="w-full bg-red-600/10 text-red-500 hover:bg-red-600 hover:text-white py-3 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 transition-all">
           <LogOut size={18} /> Cerrar Sesión
         </button>
       </aside>
@@ -747,17 +563,14 @@ export default function VisbackDashboard() {
             <button onClick={() => setMenuAbierto(true)} className="bg-slate-950 text-white px-3 py-2.5 rounded-xl font-semibold text-sm flex items-center gap-2 cursor-pointer">
               <Menu size={18} className="text-purple-400" /> Menú
             </button>
-            <button onClick={sincronizarConGoogleSheets} className="bg-purple-100 hover:bg-purple-200 text-purple-700 px-3 py-2 rounded-xl text-xs font-bold cursor-pointer transition-all">
-              🔄 Sincronizar Stock
+            <button onClick={sincronizarConGoogleSheets} className="bg-purple-100 hover:bg-purple-200 text-purple-700 px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer">
+              <RefreshCw size={14} /> Sincronizar Stock
             </button>
           </div>
           <div className="flex items-center gap-3">
             <span className="bg-purple-50 border border-purple-200 text-purple-700 px-3 py-1.5 rounded-xl font-bold text-sm">
               ${usuarioActual?.saldo.toFixed(2) || '0.00'} MXN
             </span>
-            <div className="w-9 h-9 rounded-full bg-purple-600 text-white flex items-center justify-center font-bold text-sm shadow-md">
-              {usuarioActual?.nombre.charAt(0)}
-            </div>
           </div>
         </header>
 
@@ -765,149 +578,127 @@ export default function VisbackDashboard() {
           {activeTab === 'admin' && usuarioActual?.rol === 'admin' && (
             <div className="space-y-6">
               <div className="bg-gradient-to-r from-amber-600 to-orange-700 rounded-3xl p-6 text-white shadow-xl">
-                <h3 className="text-2xl font-bold">Panel de Administración 🛡️ (IDs Claros)</h3>
-                <p className="text-amber-100 text-sm mt-1">Controla productos por ID y agrupa stock sin errores.</p>
+                <h3 className="text-2xl font-bold">Panel de Administración 🛡️</h3>
+                <p className="text-amber-100 text-sm mt-1">Control de productos, clientes, saldo e inventario vinculado por ID.</p>
               </div>
 
-              {/* Agregar nuevo servicio */}
+              {/* Agregar Producto */}
               <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
                 <h4 className="font-bold text-lg text-slate-800 flex items-center gap-2">
-                  <PlusCircle size={20} className="text-purple-600" /> Agregar Nuevo Servicio al Catálogo
+                  <PlusCircle size={20} className="text-purple-600" /> Agregar Producto al Catálogo
                 </h4>
                 <form onSubmit={agregarProductoAdmin} className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <input type="text" placeholder="ID único (ej. disney)" value={nuevoProdId} onChange={e => setNuevoProdId(e.target.value)} className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-mono" />
-                  <input type="text" placeholder="Nombre (ej. Disney+ 1M)" value={nuevoProdNombre} onChange={e => setNuevoProdNombre(e.target.value)} className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm" />
+                  <input type="text" placeholder="ID (ej. netflix)" value={nuevoProdId} onChange={e => setNuevoProdId(e.target.value)} className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-mono" />
+                  <input type="text" placeholder="Nombre (ej. Netflix 1M)" value={nuevoProdNombre} onChange={e => setNuevoProdNombre(e.target.value)} className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm" />
                   <input type="number" placeholder="Precio ($ MXN)" value={nuevoProdPrecio} onChange={e => setNuevoProdPrecio(e.target.value)} className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm" />
-                  <input type="text" placeholder="Descripción (ej. Respetar dispositivo)" value={nuevoProdDesc} onChange={e => setNuevoProdDesc(e.target.value)} className="sm:col-span-3 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm" />
-                  <button type="submit" className="sm:col-span-3 bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 rounded-xl text-sm cursor-pointer transition-all shadow-md shadow-purple-600/20">
-                    Publicar Producto en la Tienda y Google Sheets
-                  </button>
+                  <input type="text" placeholder="Descripción" value={nuevoProdDesc} onChange={e => setNuevoProdDesc(e.target.value)} className="sm:col-span-3 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm" />
+                  <button type="submit" className="sm:col-span-3 bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 rounded-xl text-sm cursor-pointer">Guardar Producto</button>
                 </form>
               </div>
 
-              {/* Carga Unitaria */}
+              {/* Agregar Credencial Individual */}
               <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
                 <h4 className="font-bold text-lg text-slate-800 flex items-center gap-2">
-                  <KeyRound size={20} className="text-amber-600" /> Agregar Cuenta Individual (Suma Stock Automático)
+                  <KeyRound size={20} className="text-amber-600" /> Agregar Cuenta Individual al Inventario
                 </h4>
                 <form onSubmit={agregarCredencialInventario} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                  <select 
-                    value={credProdId} 
-                    onChange={e => setCredProdId(e.target.value)} 
-                    className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold"
-                  >
+                  <select value={credProdId} onChange={e => setCredProdId(e.target.value)} className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold">
                     {productos.map(p => (
-                      <option key={p.id} value={p.id}>{p.nombre} (Stock: {obtenerStock(p.id)})</option>
+                      <option key={p.id} value={p.id}>{p.nombre} (ID: {p.id}) - Stock: {obtenerStock(p.id)}</option>
                     ))}
                   </select>
-                  <input type="text" placeholder="Correo de la cuenta" value={credCorreo} onChange={e => setCredCorreo(e.target.value)} className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm" />
+                  <input type="text" placeholder="Correo" value={credCorreo} onChange={e => setCredCorreo(e.target.value)} className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm" />
                   <input type="text" placeholder="Contraseña" value={credPass} onChange={e => setCredPass(e.target.value)} className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm" />
                   <input type="text" placeholder="PIN (Opcional)" value={credPin} onChange={e => setCredPin(e.target.value)} className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm" />
-                  <button type="submit" className="sm:col-span-2 lg:col-span-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl text-sm cursor-pointer transition-all shadow-md shadow-emerald-600/25">
-                    Guardar Credencial en Google Sheets y Sumar Stock
-                  </button>
+                  <button type="submit" className="sm:col-span-2 lg:col-span-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl text-sm cursor-pointer">Guardar Credencial y Aumentar Stock</button>
                 </form>
               </div>
 
               {/* Carga Masiva */}
               <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-                <h4 className="font-bold text-lg text-slate-800 flex items-center gap-2 text-purple-700">
-                  <KeyRound size={20} /> Carga Masiva de Credenciales
+                <h4 className="font-bold text-lg text-slate-800 flex items-center gap-2">
+                  <KeyRound size={20} className="text-purple-600" /> Carga Masiva de Credenciales
                 </h4>
                 <form onSubmit={agregarCredencialMasiva} className="space-y-4">
                   <div className="max-w-xs">
-                    <label className="block text-xs font-bold text-slate-700 mb-1">Seleccionar Servicio Destino:</label>
-                    <select 
-                      value={credProdId} 
-                      onChange={e => setCredProdId(e.target.value)} 
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold"
-                    >
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Seleccionar Servicio:</label>
+                    <select value={credProdId} onChange={e => setCredProdId(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold">
                       {productos.map(p => (
-                        <option key={p.id} value={p.id}>{p.nombre} (Stock actual: {obtenerStock(p.id)})</option>
+                        <option key={p.id} value={p.id}>{p.nombre} (Stock: {obtenerStock(p.id)})</option>
                       ))}
                     </select>
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">Lista de Cuentas (Una por renglón: correo pass pin):</label>
-                    <textarea 
-                      rows={5}
-                      placeholder="cuenta1@gmail.com pass123 1111&#10;cuenta2@gmail.com pass456 2222"
-                      value={textoMasivo}
-                      onChange={e => setTextoMasivo(e.target.value)}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl p-4 text-xs font-mono focus:outline-none focus:border-purple-500"
-                    />
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Cuentas (Una por renglón: correo pass pin):</label>
+                    <textarea rows={4} placeholder="correo1@gmail.com pass123 1234&#10;correo2@gmail.com pass456 5678" value={textoMasivo} onChange={e => setTextoMasivo(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl p-4 text-xs font-mono" />
                   </div>
-                  <button type="submit" className="bg-purple-600 hover:bg-purple-700 text-white font-bold px-6 py-3 rounded-xl text-sm cursor-pointer transition-all shadow-md shadow-purple-600/20">
-                    🚀 Cargar Todas a Google Sheets y Aumentar Stock Masivamente
-                  </button>
+                  <button type="submit" className="bg-purple-600 hover:bg-purple-700 text-white font-bold px-6 py-3 rounded-xl text-sm cursor-pointer">Cargar Masivamente</button>
                 </form>
               </div>
 
-              {/* Inventario */}
+              {/* Inventario Tabla */}
               <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-                <h4 className="font-bold text-lg text-slate-800 flex items-center gap-2">
-                  <KeyRound size={20} className="text-purple-600" /> Inventario de Cuentas en la Nube ({inventarioCredenciales.length})
-                </h4>
+                <h4 className="font-bold text-lg text-slate-800">Inventario Actual en la Nube ({inventarioCredenciales.length})</h4>
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-sm">
                     <thead>
-                      <tr className="bg-slate-50 text-slate-500 font-bold uppercase border-b">
-                        <th className="p-3">ID Servicio</th>
-                        <th className="p-3">Correo / Pass / PIN</th>
+                      <tr className="bg-slate-50 text-slate-500 font-bold uppercase border-b text-xs">
+                        <th className="p-3">ID Producto</th>
+                        <th className="p-3">Credencial</th>
                         <th className="p-3">Estado</th>
                         <th className="p-3 text-center">Acción</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y">
-                      {inventarioCredenciales.map(c => {
-                        const prod = productos.find(p => p.id === c.productoId);
-                        return (
-                          <tr key={c.id}>
-                            <td className="p-3 font-semibold font-mono text-purple-700">{prod ? prod.nombre : c.productoId}</td>
-                            <td className="p-3 font-mono text-xs">{c.correo} / {c.pass} / {c.pin}</td>
-                            <td className="p-3">
-                              <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${c.estado === 'disponible' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
-                                {c.estado}
-                              </span>
-                            </td>
-                            <td className="p-3 text-center">
-                              <button onClick={() => eliminarCredencial(c.id)} className="bg-red-100 text-red-600 hover:bg-red-200 p-1.5 rounded-lg text-xs font-bold cursor-pointer">
-                                <Trash2 size={14} />
-                              </button>
-                            </td>
-                          </tr>
-                        );
-                      })}
+                      {inventarioCredenciales.map(c => (
+                        <tr key={c.id}>
+                          <td className="p-3 font-mono font-bold text-purple-600">{c.productoId}</td>
+                          <td className="p-3 font-mono text-xs">{c.correo} / {c.pass}</td>
+                          <td className="p-3"><span className={`px-2 py-0.5 rounded-full text-xs font-bold ${c.estado === 'disponible' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>{c.estado}</span></td>
+                          <td className="p-3 text-center">
+                            <button onClick={() => eliminarCredencial(c.id)} className="bg-red-100 text-red-600 hover:bg-red-200 p-1.5 rounded-lg cursor-pointer"><Trash2 size={14} /></button>
+                          </td>
+                        </tr>
+                      ))}
                     </tbody>
                   </table>
                 </div>
               </div>
 
-              {/* Clientes y Productos */}
+              {/* Gestión de Usuarios y Saldo */}
               <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
                 <h4 className="font-bold text-lg text-slate-800 flex items-center gap-2">
-                  <ShoppingBag size={20} className="text-purple-600" /> Productos en el Catálogo ({productos.length})
+                  <Users size={20} className="text-purple-600" /> Gestión de Clientes y Saldos ({usuariosRegistrados.length})
                 </h4>
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-sm">
                     <thead>
-                      <tr className="bg-slate-50 text-slate-500 font-bold uppercase border-b">
-                        <th className="p-3">ID</th>
-                        <th className="p-3">Servicio</th>
-                        <th className="p-3">Precio</th>
-                        <th className="p-3">Stock Actual</th>
+                      <tr className="bg-slate-50 text-slate-500 font-bold uppercase border-b text-xs">
+                        <th className="p-3">Nombre / Correo</th>
+                        <th className="p-3">Saldo Actual</th>
+                        <th className="p-3">Recargar / Ajustar Saldo</th>
                         <th className="p-3 text-center">Acción</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y">
-                      {productos.map(p => (
-                        <tr key={p.id}>
-                          <td className="p-3 font-mono text-xs text-slate-500 font-bold">{p.id}</td>
-                          <td className="p-3 font-semibold">{p.nombre}</td>
-                          <td className="p-3">${p.precio.toFixed(2)}</td>
-                          <td className="p-3"><span className="bg-emerald-100 text-emerald-700 px-2.5 py-1 rounded-full font-bold text-xs">{obtenerStock(p.id)} disponibles</span></td>
+                      {usuariosRegistrados.map(u => (
+                        <tr key={u.email}>
+                          <td className="p-3">
+                            <div className="font-bold">{u.nombre}</div>
+                            <div className="text-xs text-slate-400 font-mono">{u.email}</div>
+                          </td>
+                          <td className="p-3 font-bold text-emerald-600">${u.saldo.toFixed(2)}</td>
+                          <td className="p-3">
+                            <div className="flex items-center gap-2">
+                              <input type="number" placeholder="Monto" value={cantidadesRecarga[u.email] || ''} onChange={e => setCantidadesRecarga({ ...cantidadesRecarga, [u.email]: e.target.value })} className="w-24 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-xs" />
+                              <button onClick={() => ajustarSaldoUsuario(u.email, 'agregar')} className="bg-emerald-600 hover:bg-emerald-700 text-white px-2.5 py-1 rounded-lg text-xs font-bold cursor-pointer">+</button>
+                              <button onClick={() => ajustarSaldoUsuario(u.email, 'quitar')} className="bg-red-600 hover:bg-red-700 text-white px-2.5 py-1 rounded-lg text-xs font-bold cursor-pointer">-</button>
+                            </div>
+                          </td>
                           <td className="p-3 text-center">
-                            <button onClick={() => eliminarProducto(p.id)} className="bg-red-100 text-red-600 hover:bg-red-200 px-3 py-1 rounded-lg text-xs font-bold cursor-pointer transition-all">Eliminar</button>
+                            {u.email !== 'admin@visback.com' && (
+                              <button onClick={() => eliminarUsuario(u.email)} className="bg-red-100 text-red-600 hover:bg-red-200 px-3 py-1 rounded-lg text-xs font-bold cursor-pointer">Eliminar</button>
+                            )}
                           </td>
                         </tr>
                       ))}
@@ -920,13 +711,10 @@ export default function VisbackDashboard() {
 
           {activeTab === 'inicio' && (
             <div className="space-y-6">
-              <div className="bg-gradient-to-r from-purple-700 to-indigo-800 rounded-3xl p-6 text-white shadow-xl flex justify-between items-center">
-                <div>
-                  <h3 className="text-2xl font-bold">Bienvenido, {usuarioActual?.nombre} 👋</h3>
-                  <p className="text-purple-200 text-sm mt-1">Elige tus servicios de streaming favoritos con entrega automática.</p>
-                </div>
+              <div className="bg-gradient-to-r from-purple-700 to-indigo-800 rounded-3xl p-6 text-white shadow-xl">
+                <h3 className="text-2xl font-bold">Bienvenido, {usuarioActual?.nombre} 👋</h3>
+                <p className="text-purple-200 text-sm mt-1">Elige tus servicios de streaming favoritos con entrega automática instantánea.</p>
               </div>
-
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                 {productos.map(p => {
                   const stockActual = obtenerStock(p.id);
@@ -941,11 +729,7 @@ export default function VisbackDashboard() {
                       </div>
                       <div className="flex items-center justify-between pt-4 border-t border-slate-100">
                         <span className="text-xl font-bold text-slate-900">${p.precio.toFixed(2)}</span>
-                        <button 
-                          onClick={() => setProductoAConfirmar(p)} 
-                          disabled={stockActual === 0}
-                          className={`font-medium px-4 py-2 rounded-xl text-sm shadow-md transition-all ${stockActual > 0 ? 'bg-purple-600 hover:bg-purple-700 text-white cursor-pointer shadow-purple-600/20' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}
-                        >
+                        <button onClick={() => setProductoAConfirmar(p)} disabled={stockActual === 0} className={`font-medium px-4 py-2 rounded-xl text-sm cursor-pointer transition-all ${stockActual > 0 ? 'bg-purple-600 hover:bg-purple-700 text-white shadow-md shadow-purple-600/20' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}>
                           {stockActual > 0 ? 'Comprar' : 'Agotado'}
                         </button>
                       </div>
@@ -958,16 +742,15 @@ export default function VisbackDashboard() {
 
           {activeTab === 'compras' && (
             <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-4">
-              <h3 className="font-bold text-lg">Tus Compras Activas y Vencimientos</h3>
+              <h3 className="font-bold text-lg">Tus Compras y Credenciales Activas</h3>
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-sm">
                   <thead>
-                    <tr className="bg-slate-50 text-slate-500 font-bold uppercase border-b">
+                    <tr className="bg-slate-50 text-slate-500 font-bold uppercase border-b text-xs">
                       <th className="p-3">Pedido</th>
                       <th className="p-3">Producto</th>
-                      <th className="p-3">Credenciales de Acceso</th>
+                      <th className="p-3">Credenciales</th>
                       <th className="p-3">Vencimiento</th>
-                      <th className="p-3">Estado</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y">
@@ -975,26 +758,27 @@ export default function VisbackDashboard() {
                       <tr key={c.id}>
                         <td className="p-3 font-bold">{c.id}</td>
                         <td className="p-3 font-semibold">{c.producto}</td>
-                        <td className="p-3 font-mono text-xs text-slate-600 space-y-1">
+                        <td className="p-3 font-mono text-xs space-y-1">
                           <div className="flex items-center justify-between bg-slate-50 p-1.5 rounded-lg border">
                             <span>Correo: <strong>{c.correo}</strong></span>
-                            <button onClick={() => { navigator.clipboard.writeText(c.correo); alert("¡Correo copiado!"); }} className="bg-purple-100 hover:bg-purple-200 text-purple-700 px-2 py-0.5 rounded text-[10px] font-bold cursor-pointer">Copiar</button>
+                            <button onClick={() => { navigator.clipboard.writeText(c.correo); alert("¡Copiado!"); }} className="bg-purple-100 hover:bg-purple-200 text-purple-700 px-2 py-0.5 rounded text-[10px] font-bold cursor-pointer">Copiar</button>
                           </div>
                           <div className="flex items-center justify-between bg-slate-50 p-1.5 rounded-lg border">
                             <span>Pass: <strong>{c.pass}</strong></span>
-                            <button onClick={() => { navigator.clipboard.writeText(c.pass); alert("¡Contraseña copiada!"); }} className="bg-purple-100 hover:bg-purple-200 text-purple-700 px-2 py-0.5 rounded text-[10px] font-bold cursor-pointer">Copiar</button>
+                            <button onClick={() => { navigator.clipboard.writeText(c.pass); alert("¡Copiado!"); }} className="bg-purple-100 hover:bg-purple-200 text-purple-700 px-2 py-0.5 rounded text-[10px] font-bold cursor-pointer">Copiar</button>
                           </div>
-                          <div className="flex items-center justify-between bg-slate-50 p-1.5 rounded-lg border">
-                            <span>PIN: <strong className="text-purple-600">{c.pin}</strong></span>
-                            <button onClick={() => { navigator.clipboard.writeText(c.pin); alert("¡PIN copiado!"); }} className="bg-purple-100 hover:bg-purple-200 text-purple-700 px-2 py-0.5 rounded text-[10px] font-bold cursor-pointer">Copiar</button>
-                          </div>
+                          {c.pin !== 'N/A' && (
+                            <div className="flex items-center justify-between bg-slate-50 p-1.5 rounded-lg border">
+                              <span>PIN: <strong className="text-purple-600">{c.pin}</strong></span>
+                              <button onClick={() => { navigator.clipboard.writeText(c.pin); alert("¡Copiado!"); }} className="bg-purple-100 hover:bg-purple-200 text-purple-700 px-2 py-0.5 rounded text-[10px] font-bold cursor-pointer">Copiar</button>
+                            </div>
+                          )}
                         </td>
                         <td className="p-3">
-                          <div className="inline-flex items-center gap-1.5 bg-amber-50 text-amber-800 px-3 py-1.5 rounded-xl text-xs font-bold border border-amber-200">
+                          <span className="bg-amber-50 text-amber-800 px-3 py-1.5 rounded-xl text-xs font-bold border border-amber-200 flex items-center gap-1 w-max">
                             <Clock size={14} /> {c.vencimiento}
-                          </div>
+                          </span>
                         </td>
-                        <td className="p-3"><span className="bg-emerald-100 text-emerald-700 text-xs font-bold px-2.5 py-1 rounded-full">{c.estado}</span></td>
                       </tr>
                     ))}
                   </tbody>
@@ -1009,12 +793,7 @@ export default function VisbackDashboard() {
                 <span className="text-xs font-bold uppercase text-slate-400 tracking-wider">Saldo disponible</span>
                 <h3 className="text-3xl font-black text-slate-900 mt-1">${usuarioActual?.saldo.toFixed(2)} MXN</h3>
               </div>
-              <a 
-                href={`https://wa.me/${whatsappNumber}?text=Hola%20Visback%20Stream,%20quiero%20realizar%20una%20recarga%20de%20saldo.`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-6 py-3 rounded-2xl transition-all shadow-lg shadow-emerald-600/20 flex items-center gap-2 text-sm"
-              >
+              <a href={`https://wa.me/${whatsappNumber}?text=Hola%20Visback%20Stream,%20quiero%20recargar%20saldo.`} target="_blank" rel="noopener noreferrer" className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-6 py-3 rounded-2xl transition-all shadow-lg shadow-emerald-600/20 flex items-center gap-2 text-sm cursor-pointer">
                 <MessageCircle size={18} /> Solicitar Recarga por WhatsApp
               </a>
             </div>
@@ -1023,31 +802,31 @@ export default function VisbackDashboard() {
       </div>
 
       {productoAConfirmar && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
           <div className="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl text-center space-y-4">
-            <h3 className="text-lg font-extrabold text-slate-900">Confirmar Compra</h3>
-            <p className="text-slate-600 text-sm">¿Deseas comprar <strong>{productoAConfirmar.nombre}</strong> por ${productoAConfirmar.precio.toFixed(2)} MXN?</p>
+            <h3 className="text-lg font-extrabold">Confirmar Compra</h3>
+            <p className="text-sm">¿Deseas comprar <strong>{productoAConfirmar.nombre}</strong> por ${productoAConfirmar.precio.toFixed(2)} MXN?</p>
             <div className="flex gap-3 pt-2">
-              <button onClick={() => setProductoAConfirmar(null)} className="flex-1 bg-slate-200 text-slate-700 font-bold py-2.5 rounded-xl text-sm cursor-pointer">No</button>
-              <button onClick={ejecutarCompraFinal} className="flex-1 bg-purple-600 text-white font-bold py-2.5 rounded-xl text-sm cursor-pointer">Sí</button>
+              <button onClick={() => setProductoAConfirmar(null)} className="flex-1 bg-slate-200 hover:bg-slate-300 py-2.5 rounded-xl font-bold text-sm cursor-pointer">No</button>
+              <button onClick={ejecutarCompraFinal} className="flex-1 bg-purple-600 hover:bg-purple-700 text-white py-2.5 rounded-xl font-bold text-sm cursor-pointer shadow-md">Sí</button>
             </div>
           </div>
         </div>
       )}
 
       {compraExitosa && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
           <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl text-center space-y-4">
             <div className="w-14 h-14 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto">
               <CheckCircle2 size={32} />
             </div>
-            <h3 className="text-xl font-extrabold text-slate-900">¡Compra Exitosa!</h3>
-            <div className="bg-slate-50 rounded-2xl p-4 text-left border font-mono text-xs space-y-1">
+            <h3 className="text-xl font-extrabold">¡Compra Exitosa!</h3>
+            <div className="bg-slate-50 p-4 rounded-2xl font-mono text-xs text-left space-y-2 border">
               <div>Correo: <strong>{compraExitosa.correo}</strong></div>
               <div>Contraseña: <strong>{compraExitosa.pass}</strong></div>
-              <div>PIN: <strong className="text-purple-600">{compraExitosa.pin}</strong></div>
+              {compraExitosa.pin !== 'N/A' && <div>PIN: <strong className="text-purple-600">{compraExitosa.pin}</strong></div>}
             </div>
-            <button onClick={() => setCompraExitosa(null)} className="w-full bg-purple-600 text-white font-bold py-3 rounded-2xl text-sm cursor-pointer">Aceptar</button>
+            <button onClick={() => setCompraExitosa(null)} className="w-full bg-purple-600 hover:bg-purple-700 text-white py-3 rounded-2xl font-bold text-sm cursor-pointer shadow-md">Aceptar</button>
           </div>
         </div>
       )}
