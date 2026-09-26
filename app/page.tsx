@@ -54,7 +54,7 @@ interface Usuario {
   saldo: number;
 }
 
-const GOOGLE_SHEET_URL = "https://script.google.com/macros/s/AKfycbxDn4pw8o5OZycQVJTGjXhuuyIEjKiNhoPaxwJXIAF5JxYHu4GcIWV04H-rhH3ktQJhCw/exec";
+const GOOGLE_SHEET_URL = "https://script.google.com/macros/s/AKfycbyYkIo1Evq1dNRo4j9djZEaCRPAPvOsNbxQr5kI2Zsaqlsny4giZOMSILVBCggeJECTnQ/exec";
 
 export default function VisbackDashboard() {
   const [viewMode, setViewMode] = useState<'login' | 'register' | 'app'>('login');
@@ -71,55 +71,22 @@ export default function VisbackDashboard() {
   const [adminNuevoPass, setAdminNuevoPass] = useState('');
   const [adminNuevoEstado, setAdminNuevoEstado] = useState<'activo' | 'pendiente'>('activo');
 
-  const [usuariosRegistrados, setUsuariosRegistrados] = useState<Usuario[]>([
-    { email: 'admin@visback.com', pass: 'admin123', nombre: 'Administrador', rol: 'admin', estado: 'activo', saldo: 500.00 },
-    { email: 'cliente@visback.com', pass: '123456', nombre: 'Brandon Beltran', rol: 'cliente', estado: 'activo', saldo: 125.00 }
-  ]);
-
-  // Cargar sesión guardada al abrir la página
-  useEffect(() => {
+  const [usuariosRegistrados, setUsuariosRegistrados] = useState<Usuario[]>(() => {
     if (typeof window !== 'undefined') {
-      const savedUser = localStorage.getItem('visback_usuario_actual');
-      if (savedUser) {
-        try {
-          const parsedUser = JSON.parse(savedUser);
-          setUsuarioActual(parsedUser);
-          setViewMode('app');
-          setActiveTab(parsedUser.rol === 'admin' ? 'admin' : 'inicio');
-        } catch (e) {
-          console.error(e);
-        }
+      const saved = localStorage.getItem('visback_usuarios_db');
+      if (saved) {
+        try { return JSON.parse(saved); } catch (e) { console.error(e); }
       }
     }
-  }, []);
-
-  // Sincronizar usuarios desde Google Sheets al cargar
-  useEffect(() => {
-    fetch(GOOGLE_SHEET_URL)
-      .then(res => res.json())
-      .then(data => {
-        if (Array.isArray(data) && data.length > 0) {
-          const formateados: Usuario[] = data.map((u: any) => ({
-            email: u.email || '',
-            pass: u.pass || '',
-            nombre: u.nombre || '',
-            rol: (u.rol === 'admin' ? 'admin' : 'cliente'),
-            estado: (u.estado === 'pendiente' ? 'pendiente' : 'activo'),
-            saldo: Number(u.saldo) || 0
-          }));
-          // Asegurar que el admin principal siempre esté presente
-          if (!formateados.some(u => u.email === 'admin@visback.com')) {
-            formateados.unshift({ email: 'admin@visback.com', pass: 'admin123', nombre: 'Administrador', rol: 'admin', estado: 'activo', saldo: 500.00 });
-          }
-          setUsuariosRegistrados(formateados);
-        }
-      })
-      .catch(err => console.error("Error al cargar de Google Sheets:", err));
-  }, []);
+    return [
+      { email: 'admin@visback.com', pass: 'admin123', nombre: 'Administrador', rol: 'admin', estado: 'activo', saldo: 500.00 },
+      { email: 'cliente@visback.com', pass: '123456', nombre: 'Brandon Beltran', rol: 'cliente', estado: 'activo', saldo: 125.00 }
+    ];
+  });
 
   const [productos, setProductos] = useState<Producto[]>(() => {
     if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('visback_productos');
+      const saved = localStorage.getItem('visback_prods_db');
       if (saved) {
         try { return JSON.parse(saved); } catch (e) { console.error(e); }
       }
@@ -134,47 +101,105 @@ export default function VisbackDashboard() {
 
   const [inventarioCredenciales, setInventarioCredenciales] = useState<CredencialInventario[]>(() => {
     if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('visback_inventario');
+      const saved = localStorage.getItem('visback_inv_db');
       if (saved) {
         try { return JSON.parse(saved); } catch (e) { console.error(e); }
       }
     }
-    return [
-      { id: 1, productoId: 1, correo: 'net1@visback.com', pass: 'pass123', pin: '1111', estado: 'disponible' },
-      { id: 2, productoId: 1, correo: 'net2@visback.com', pass: 'pass456', pin: '2222', estado: 'disponible' },
-      { id: 3, productoId: 4, correo: 'vix1@visback.com', pass: 'vixpass', pin: '3333', estado: 'disponible' },
-    ];
+    return [];
   });
 
   const [compras, setCompras] = useState<Compra[]>(() => {
     if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('visback_compras');
+      const saved = localStorage.getItem('visback_compras_db');
       if (saved) {
         try { return JSON.parse(saved); } catch (e) { console.error(e); }
       }
     }
-    return [
-      { id: '#002004', producto: 'ViX Premium 1M', correo: 'vixprem1@gmail.com', pass: 'vix2026', pin: '1234', precio: 10.00, vencimiento: '24/10/2026', estado: 'Activa' },
-    ];
+    return [];
   });
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      localStorage.setItem('visback_productos', JSON.stringify(productos));
+      localStorage.setItem('visback_usuarios_db', JSON.stringify(usuariosRegistrados));
+    }
+  }, [usuariosRegistrados]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('visback_prods_db', JSON.stringify(productos));
     }
   }, [productos]);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      localStorage.setItem('visback_inventario', JSON.stringify(inventarioCredenciales));
+      localStorage.setItem('visback_inv_db', JSON.stringify(inventarioCredenciales));
     }
   }, [inventarioCredenciales]);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      localStorage.setItem('visback_compras', JSON.stringify(compras));
+      localStorage.setItem('visback_compras_db', JSON.stringify(compras));
     }
   }, [compras]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedUser = localStorage.getItem('visback_usuario_actual');
+      if (savedUser) {
+        try {
+          const parsedUser = JSON.parse(savedUser);
+          setUsuarioActual(parsedUser);
+          setViewMode('app');
+          setActiveTab(parsedUser.rol === 'admin' ? 'admin' : 'inicio');
+        } catch (e) {
+          console.error(e);
+        }
+      }
+    }
+
+    fetch(GOOGLE_SHEET_URL)
+      .then(res => res.json())
+      .then(data => {
+        if (data.usuarios && Array.isArray(data.usuarios) && data.usuarios.length > 0) {
+          const formU: Usuario[] = data.usuarios.map((u: any) => ({
+            email: u.email || '',
+            pass: u.pass || '',
+            nombre: u.nombre || '',
+            rol: (u.rol === 'admin' ? 'admin' : 'cliente'),
+            estado: (u.estado === 'pendiente' ? 'pendiente' : 'activo'),
+            saldo: Number(u.saldo) || 0
+          }));
+          if (!formU.some(u => u.email === 'admin@visback.com')) {
+            formU.unshift({ email: 'admin@visback.com', pass: 'admin123', nombre: 'Administrador', rol: 'admin', estado: 'activo', saldo: 500.00 });
+          }
+          setUsuariosRegistrados(formU);
+        }
+
+        if (data.productos && Array.isArray(data.productos) && data.productos.length > 0) {
+          const formP: Producto[] = data.productos.map((p: any) => ({
+            id: Number(p.id) || Date.now(),
+            nombre: p.nombre || '',
+            desc: p.desc || '',
+            precio: Number(p.precio) || 0
+          }));
+          setProductos(formP);
+        }
+
+        if (data.inventario && Array.isArray(data.inventario) && data.inventario.length > 0) {
+          const formI: CredencialInventario[] = data.inventario.map((i: any) => ({
+            id: Number(i.id) || Date.now(),
+            productoId: Number(i.productoId) || 0,
+            correo: i.correo || '',
+            pass: i.pass || '',
+            pin: i.pin || 'N/A',
+            estado: (i.estado === 'vendida' ? 'vendida' : 'disponible')
+          }));
+          setInventarioCredenciales(formI);
+        }
+      })
+      .catch(err => console.error("Aviso: Usando respaldo local", err));
+  }, []);
 
   const [usuarioActual, setUsuarioActual] = useState<Usuario | null>(null);
   const [activeTab, setActiveTab] = useState<'inicio' | 'compras' | 'billetera' | 'admin'>('inicio');
@@ -210,52 +235,26 @@ export default function VisbackDashboard() {
     );
 
     if (!encontrado) {
-      alert(`Acceso denegado. Verificando: [${emailVal}] / [${passVal}]. Correo o contraseña incorrectos.`);
+      alert(`Acceso denegado. Correo o contraseña incorrectos.`);
       return;
     }
     setUsuarioActual(encontrado);
     setViewMode('app');
     setActiveTab(encontrado.rol === 'admin' ? 'admin' : 'inicio');
 
-    // Guardar sesión en localStorage
     if (typeof window !== 'undefined') {
       localStorage.setItem('visback_usuario_actual', JSON.stringify(encontrado));
     }
   };
 
-  const handleRegister = async (e: React.FormEvent) => {
+  const handleRegisterWhatsAppOnly = (e: React.FormEvent) => {
     e.preventDefault();
     if (!regNombre || !regEmail || !regPassword) {
       alert("Completa todos los campos.");
       return;
     }
-    if (usuariosRegistrados.some(u => u.email.toLowerCase() === regEmail.toLowerCase())) {
-      alert("Este correo ya está registrado.");
-      return;
-    }
-    const nuevo: Usuario = { 
-      email: regEmail, 
-      pass: regPassword, 
-      nombre: regNombre, 
-      rol: 'cliente',
-      estado: 'activo',
-      saldo: 0.00
-    };
-    
-    setUsuariosRegistrados(prev => [...prev, nuevo]);
 
-    try {
-      await fetch(GOOGLE_SHEET_URL, {
-        method: 'POST',
-        mode: 'no-cors',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'register', ...nuevo })
-      });
-    } catch (err) {
-      console.error("Error al sincronizar con Sheets:", err);
-    }
-
-    const mensaje = encodeURIComponent(`Hola Visback Stream, me acabo de registrar. \n\nNombre: ${regNombre}\nCorreo: ${regEmail}\nContraseña: ${regPassword}\n\nSolicito la activación de mi cuenta.`);
+    const mensaje = encodeURIComponent(`Hola Visback Stream, me quiero registrar. \n\nNombre: ${regNombre}\nCorreo deseado: ${regEmail}\nContraseña deseada: ${regPassword}\n\nSolicito la creación y activación de mi cuenta.`);
     window.open(`https://wa.me/${whatsappNumber}?text=${mensaje}`, '_blank');
 
     setRegNombre('');
@@ -294,14 +293,14 @@ export default function VisbackDashboard() {
         body: JSON.stringify({ action: 'add', ...nuevoCliente })
       });
     } catch (err) {
-      console.error("Error al sincronizar con Sheets:", err);
+      console.error(err);
     }
 
     setAdminNuevoNombre('');
     setAdminNuevoEmail('');
     setAdminNuevoPass('');
     setAdminNuevoEstado('activo');
-    alert(`¡Cliente ${nuevoCliente.nombre} creado y guardado en Google Sheets con éxito!`);
+    alert(`¡Cliente ${nuevoCliente.nombre} creado con éxito y guardado en Google Sheets!`);
   };
 
   const eliminarUsuario = async (email: string) => {
@@ -320,7 +319,7 @@ export default function VisbackDashboard() {
           body: JSON.stringify({ action: 'delete', email })
         });
       } catch (err) {
-        console.error("Error al eliminar en Sheets:", err);
+        console.error(err);
       }
     }
   };
@@ -351,14 +350,10 @@ export default function VisbackDashboard() {
     }));
 
     setCantidadesRecarga(prev => ({ ...prev, [email]: '' }));
-    if (tipo === 'agregar') {
-      alert(`¡Se han acreditado $${monto.toFixed(2)} MXN a ${email} con éxito!`);
-    } else {
-      alert(`¡Se han descontado $${monto.toFixed(2)} MXN a ${email} con éxito!`);
-    }
+    alert(`¡Saldo actualizado con éxito!`);
   };
 
-  const agregarProductoAdmin = (e: React.FormEvent) => {
+  const agregarProductoAdmin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!nuevoProdNombre || !nuevoProdPrecio) {
       alert("Rellena el nombre y el precio del producto.");
@@ -371,19 +366,31 @@ export default function VisbackDashboard() {
       precio: parseFloat(nuevoProdPrecio)
     };
     setProductos(prev => [...prev, nuevoProducto]);
+
+    try {
+      await fetch(GOOGLE_SHEET_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'add_producto', ...nuevoProducto })
+      });
+    } catch (err) {
+      console.error(err);
+    }
+
     setNuevoProdNombre('');
     setNuevoProdDesc('');
     setNuevoProdPrecio('');
-    alert("¡Producto agregado a la tienda con éxito!");
+    alert("¡Producto agregado con éxito!");
   };
 
   const eliminarProducto = (id: number) => {
     setProductos(prev => prev.filter(p => p.id !== id));
     setInventarioCredenciales(prev => prev.filter(c => c.productoId !== id));
-    alert("Producto y sus credenciales eliminados.");
+    alert("Producto eliminado.");
   };
 
-  const agregarCredencialInventario = (e: React.FormEvent) => {
+  const agregarCredencialInventario = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!credCorreo || !credPass) {
       alert("Ingresa al menos el correo y la contraseña.");
@@ -400,16 +407,28 @@ export default function VisbackDashboard() {
     };
 
     setInventarioCredenciales(prev => [...prev, nuevaCred]);
+
+    try {
+      await fetch(GOOGLE_SHEET_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'add_credencial', ...nuevaCred })
+      });
+    } catch (err) {
+      console.error(err);
+    }
+
     setCredCorreo('');
     setCredPass('');
     setCredPin('');
-    alert("¡Credencial agregada al inventario! El stock ha aumentado automáticamente.");
+    alert("¡Credencial agregada al inventario!");
   };
 
-  const agregarCredencialMasiva = (e: React.FormEvent) => {
+  const agregarCredencialMasiva = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!textoMasivo.trim()) {
-      alert("Pega al menos una credencial en el cuadro de texto.");
+      alert("Pega al menos una credencial.");
       return;
     }
 
@@ -440,20 +459,34 @@ export default function VisbackDashboard() {
     });
 
     if (agregadas === 0) {
-      alert("No se pudo procesar ninguna credencial. Formato esperado por renglón: correo pass pin");
+      alert("Formato no válido.");
       return;
     }
 
     setInventarioCredenciales(prev => [...prev, ...nuevasCredenciales]);
+
+    for (const cred of nuevasCredenciales) {
+      try {
+        await fetch(GOOGLE_SHEET_URL, {
+          method: 'POST',
+          mode: 'no-cors',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'add_credencial', ...cred })
+        });
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
     setTextoMasivo('');
-    alert(`¡Se agregaron ${agregadas} cuentas masivas al inventario y el stock subió automáticamente!`);
+    alert(`¡Se agregaron ${agregadas} cuentas al inventario!`);
   };
 
   const eliminarCredencial = (id: number) => {
     setInventarioCredenciales(prev => prev.filter(c => c.id !== id));
   };
 
-  const ejecutarCompraFinal = () => {
+  const ejecutarCompraFinal = async () => {
     if (!productoAConfirmar || !usuarioActual) return;
     if (usuarioActual.saldo < productoAConfirmar.precio) {
       alert("Saldo insuficiente.");
@@ -473,6 +506,17 @@ export default function VisbackDashboard() {
     setInventarioCredenciales(prev => prev.map(c => 
       c.id === credencialDisponible.id ? { ...c, estado: 'vendida' } : c
     ));
+
+    try {
+      await fetch(GOOGLE_SHEET_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'vender_credencial', id: credencialDisponible.id })
+      });
+    } catch (err) {
+      console.error(err);
+    }
 
     const nuevoSaldo = usuarioActual.saldo - productoAConfirmar.precio;
     const usuarioActualizado = { ...usuarioActual, saldo: nuevoSaldo };
@@ -538,7 +582,7 @@ export default function VisbackDashboard() {
               onClick={() => setViewMode('register')}
               className="w-full block py-3 px-4 bg-purple-600 text-white font-bold rounded-xl text-xs text-center cursor-pointer hover:bg-purple-700 transition-all shadow-md shadow-purple-600/30"
             >
-              ¿No tienes cuenta? Regístrate aquí
+              ¿No tienes cuenta? Solicítala por WhatsApp
             </button>
           </div>
         </div>
@@ -551,15 +595,15 @@ export default function VisbackDashboard() {
       <div className="flex min-h-screen w-full items-center justify-center bg-slate-950 p-4 py-12 font-sans overflow-y-auto">
         <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl space-y-6 my-auto mb-16">
           <div className="text-center space-y-2">
-            <h1 className="text-2xl font-extrabold text-white">Registro de Cliente</h1>
-            <p className="text-slate-400 text-sm">Se guardará directo en Google Sheets y avísanos por WhatsApp</p>
+            <h1 className="text-2xl font-extrabold text-white">Solicitar Cuenta</h1>
+            <p className="text-slate-400 text-sm">Envía tus datos por WhatsApp para que el administrador te registre</p>
           </div>
-          <form onSubmit={handleRegister} className="space-y-4">
-            <input type="text" placeholder="Nombre completo" value={regNombre} onChange={e => setRegNombre(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-emerald-500" />
-            <input type="email" placeholder="Correo" value={regEmail} onChange={e => setRegEmail(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-emerald-500" />
-            <input type="password" placeholder="Contraseña" value={regPassword} onChange={e => setRegPassword(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-emerald-500" />
+          <form onSubmit={handleRegisterWhatsAppOnly} className="space-y-4">
+            <input type="text" placeholder="Tu nombre completo" value={regNombre} onChange={e => setRegNombre(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-emerald-500" />
+            <input type="email" placeholder="Correo deseado" value={regEmail} onChange={e => setRegEmail(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-emerald-500" />
+            <input type="password" placeholder="Contraseña deseada" value={regPassword} onChange={e => setRegPassword(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-emerald-500" />
             <button type="submit" className="w-full bg-emerald-600 text-white font-bold py-3.5 rounded-xl text-sm cursor-pointer hover:bg-emerald-700 transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/30">
-              <MessageCircle size={18} /> Registrarse y Enviar a WhatsApp
+              <MessageCircle size={18} /> Enviar Solicitud por WhatsApp
             </button>
           </form>
           <div className="text-center pt-4 border-t border-slate-800">
@@ -633,8 +677,8 @@ export default function VisbackDashboard() {
           {activeTab === 'admin' && usuarioActual?.rol === 'admin' && (
             <div className="space-y-6">
               <div className="bg-gradient-to-r from-amber-600 to-orange-700 rounded-3xl p-6 text-white shadow-xl">
-                <h3 className="text-2xl font-bold">Panel de Administración 🛡️ (Sincronizado con Sheets)</h3>
-                <p className="text-amber-100 text-sm mt-1">Controla clientes, saldos, credenciales y stock automático en la nube.</p>
+                <h3 className="text-2xl font-bold">Panel de Administración 🛡️ (Sincronizado a Google Sheets)</h3>
+                <p className="text-amber-100 text-sm mt-1">Controla productos, stock, clientes y saldos 100% en la nube.</p>
               </div>
 
               {/* Agregar nuevo servicio */}
@@ -647,7 +691,7 @@ export default function VisbackDashboard() {
                   <input type="text" placeholder="Descripción (Ej. Respetar dispositivo)" value={nuevoProdDesc} onChange={e => setNuevoProdDesc(e.target.value)} className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm" />
                   <input type="number" placeholder="Precio ($ MXN)" value={nuevoProdPrecio} onChange={e => setNuevoProdPrecio(e.target.value)} className="sm:col-span-2 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm" />
                   <button type="submit" className="sm:col-span-2 bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 rounded-xl text-sm cursor-pointer transition-all shadow-md shadow-purple-600/20">
-                    Publicar Producto en la Tienda
+                    Publicar Producto en la Tienda y Cloud
                   </button>
                 </form>
               </div>
@@ -671,7 +715,7 @@ export default function VisbackDashboard() {
                   <input type="text" placeholder="Contraseña" value={credPass} onChange={e => setCredPass(e.target.value)} className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm" />
                   <input type="text" placeholder="PIN (Opcional)" value={credPin} onChange={e => setCredPin(e.target.value)} className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm" />
                   <button type="submit" className="sm:col-span-2 lg:col-span-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl text-sm cursor-pointer transition-all shadow-md shadow-emerald-600/25">
-                    Guardar Credencial y Sumar +1 al Stock
+                    Guardar Credencial en Google Sheets y Sumar Stock
                   </button>
                 </form>
               </div>
@@ -708,7 +752,7 @@ export default function VisbackDashboard() {
                     />
                   </div>
                   <button type="submit" className="bg-purple-600 hover:bg-purple-700 text-white font-bold px-6 py-3 rounded-xl text-sm cursor-pointer transition-all shadow-md shadow-purple-600/20">
-                    🚀 Cargar Todas las Cuentas y Aumentar Stock Masivamente
+                    🚀 Cargar Todas a Google Sheets y Aumentar Stock Masivamente
                   </button>
                 </form>
               </div>
@@ -716,7 +760,7 @@ export default function VisbackDashboard() {
               {/* Inventario */}
               <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
                 <h4 className="font-bold text-lg text-slate-800 flex items-center gap-2">
-                  <KeyRound size={20} className="text-purple-600" /> Inventario de Cuentas Guardadas ({inventarioCredenciales.length})
+                  <KeyRound size={20} className="text-purple-600" /> Inventario de Cuentas en la Nube ({inventarioCredenciales.length})
                 </h4>
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-sm">
@@ -756,7 +800,7 @@ export default function VisbackDashboard() {
               {/* Agregar Cliente Manual */}
               <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
                 <h4 className="font-bold text-lg text-slate-800 flex items-center gap-2">
-                  <UserPlus size={20} className="text-amber-600" /> Agregar Nuevo Cliente (Sincroniza a Sheets)
+                  <UserPlus size={20} className="text-amber-600" /> Registrar Cliente Oficial (Sincroniza a Google Sheets)
                 </h4>
                 <form onSubmit={agregarClienteAdmin} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                   <input type="text" placeholder="Nombre del cliente" value={adminNuevoNombre} onChange={e => setAdminNuevoNombre(e.target.value)} className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm" />
@@ -979,7 +1023,7 @@ export default function VisbackDashboard() {
             <p className="text-slate-600 text-sm">¿Deseas comprar <strong>{productoAConfirmar.nombre}</strong> por ${productoAConfirmar.precio.toFixed(2)} MXN?</p>
             <div className="flex gap-3 pt-2">
               <button onClick={() => setProductoAConfirmar(null)} className="flex-1 bg-slate-200 text-slate-700 font-bold py-2.5 rounded-xl text-sm cursor-pointer">No</button>
-              <button onClick={ejecutarCompraFinal} className="flex-1 bg-purple-600 text-white font-bold py.2.5 rounded-xl text-sm cursor-pointer">Sí</button>
+              <button onClick={ejecutarCompraFinal} className="flex-1 bg-purple-600 text-white font-bold py-2.5 rounded-xl text-sm cursor-pointer">Sí</button>
             </div>
           </div>
         </div>
