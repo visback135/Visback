@@ -193,7 +193,7 @@ export default function VisbackDashboard() {
             correo: i.correo || '',
             pass: i.pass || '',
             pin: i.pin || 'N/A',
-            estado: (i.estado === 'vendida' ? 'vendida' : 'disponible')
+            estado: (String(i.estado).trim().toLowerCase() === 'vendida' ? 'vendida' : 'disponible')
           }));
           setInventarioCredenciales(formI);
         }
@@ -222,7 +222,7 @@ export default function VisbackDashboard() {
   const whatsappNumber = "5217734092937";
 
   const obtenerStock = (productoId: number) => {
-    return inventarioCredenciales.filter(c => c.productoId === productoId && c.estado === 'disponible').length;
+    return inventarioCredenciales.filter(c => Number(c.productoId) === Number(productoId) && String(c.estado).trim().toLowerCase() === 'disponible').length;
   };
 
   const handleLogin = (e?: React.SyntheticEvent) => {
@@ -524,7 +524,7 @@ export default function VisbackDashboard() {
     }
 
     const credencialDisponible = inventarioCredenciales.find(
-      c => c.productoId === productoAConfirmar.id && c.estado === 'disponible'
+      c => Number(c.productoId) === Number(productoAConfirmar.id) && String(c.estado).trim().toLowerCase() === 'disponible'
     );
 
     if (!credencialDisponible) {
@@ -815,10 +815,10 @@ export default function VisbackDashboard() {
                     </thead>
                     <tbody className="divide-y">
                       {inventarioCredenciales.map(c => {
-                        const prod = productos.find(p => p.id === c.productoId);
+                        const prod = productos.find(p => Number(p.id) === Number(c.productoId));
                         return (
                           <tr key={c.id}>
-                            <td className="p-3 font-semibold">{prod ? prod.nombre : 'Desconocido'}</td>
+                            <td className="p-3 font-semibold">{prod ? prod.nombre : `Desconocido (ID: ${c.productoId})`}</td>
                             <td className="p-3 font-mono text-xs">{c.correo} / {c.pass} / {c.pin}</td>
                             <td className="p-3">
                               <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${c.estado === 'disponible' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
