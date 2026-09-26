@@ -151,22 +151,8 @@ export default function VisbackDashboard() {
     }
   }, [productos]);
 
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const savedUser = localStorage.getItem('visback_usuario_actual');
-      if (savedUser) {
-        try {
-          const parsedUser = JSON.parse(savedUser);
-          setUsuarioActual(parsedUser);
-          setViewMode('app');
-          setActiveTab(parsedUser.rol === 'admin' ? 'admin' : 'inicio');
-        } catch (e) {
-          console.error(e);
-        }
-      }
-    }
-
-    fetch(GOOGLE_SHEET_URL)
+  const sincronizarConGoogleSheets = () => {
+    fetch(GOOGLE_SHEET_URL + "?t=" + Date.now())
       .then(res => res.json())
       .then(data => {
         if (data.usuarios && Array.isArray(data.usuarios) && data.usuarios.length > 0) {
@@ -192,7 +178,9 @@ export default function VisbackDashboard() {
             precio: Number(p.precio) || 0
           }));
           setProductos(formP);
-          if (formP.length > 0) setCredProdId(formP[0].id);
+          if (formP.length > 0 && !formP.some(p => p.id === credProdId)) {
+            setCredProdId(formP[0].id);
+          }
         }
 
         if (data.inventario && Array.isArray(data.inventario) && data.inventario.length > 0) {
@@ -208,7 +196,30 @@ export default function VisbackDashboard() {
         }
       })
       .catch(err => console.error("Aviso: Usando respaldo local", err));
+  };
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedUser = localStorage.getItem('visback_usuario_actual');
+      if (savedUser) {
+        try {
+          const parsedUser = JSON.parse(savedUser);
+          setUsuarioActual(parsedUser);
+          setViewMode('app');
+          setActiveTab(parsedUser.rol === 'admin' ? 'admin' : 'inicio');
+        } catch (e) {
+          console.error(e);
+        }
+      }
+    }
+    sincronizarConGoogleSheets();
   }, []);
+
+  useEffect(() => {
+    if (activeTab === 'inicio' || activeTab === 'admin') {
+      sincronizarConGoogleSheets();
+    }
+  }, [activeTab]);
 
   const [usuarioActual, setUsuarioActual] = useState<Usuario | null>(null);
   const [activeTab, setActiveTab] = useState<'inicio' | 'compras' | 'billetera' | 'admin'>('inicio');
