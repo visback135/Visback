@@ -16,7 +16,8 @@ import {
   Clock,
   Trash2,
   RefreshCw,
-  UserPlus
+  UserPlus,
+  ShieldAlert
 } from 'lucide-react';
 
 interface Producto {
@@ -37,6 +38,7 @@ interface CredencialInventario {
 
 interface Compra {
   id: string;
+  email: string;
   producto: string;
   correo: string;
   pass: string;
@@ -67,7 +69,6 @@ export default function VisbackDashboard() {
   const [regEmail, setRegEmail] = useState('');
   const [regPassword, setRegPassword] = useState('');
 
-  // Estados para agregar cliente desde Admin
   const [adminNuevoNombre, setAdminNuevoNombre] = useState('');
   const [adminNuevoEmail, setAdminNuevoEmail] = useState('');
   const [adminNuevoPass, setAdminNuevoPass] = useState('');
@@ -83,11 +84,11 @@ export default function VisbackDashboard() {
     { id: 'disney', nombre: 'Disney+ 1M', desc: 'Respetar 1 Dispositivo', precio: 20.00 }
   ]);
   const [inventarioCredenciales, setInventarioCredenciales] = useState<CredencialInventario[]>([]);
-  const [compras, setCompras] = useState<Compra[]>([]);
+  const [comprasGlobales, setComprasGlobales] = useState<Compra[]>([]);
 
   const [productoAConfirmar, setProductoAConfirmar] = useState<Producto | null>(null);
   const [compraExitosa, setCompraExitosa] = useState<Compra | null>(null);
-  const [procesandoCompra, setProcesandoCompra] = useState(false); // Blindaje anti doble clic
+  const [procesandoCompra, setProcesandoCompra] = useState(false);
 
   const [nuevoProdId, setNuevoProdId] = useState('');
   const [nuevoProdNombre, setNuevoProdNombre] = useState('');
@@ -130,6 +131,21 @@ export default function VisbackDashboard() {
             estado: (String(i.estado || '').trim().toLowerCase() === 'vendida' ? 'vendida' : 'disponible')
           })).filter((i: any) => i.productoId && i.productoId !== '0');
           setInventarioCredenciales(formI);
+        }
+
+        if (data.compras && Array.isArray(data.compras)) {
+          const formC: Compra[] = data.compras.map((c: any) => ({
+            id: String(c.id || ''),
+            email: String(c.email || '').trim().toLowerCase(),
+            producto: String(c.producto || ''),
+            correo: String(c.correo || ''),
+            pass: String(c.pass || ''),
+            pin: String(c.pin || 'N/A'),
+            precio: Number(c.precio) || 0,
+            vencimiento: String(c.vencimiento || ''),
+            estado: String(c.estado || 'Activa')
+          }));
+          setComprasGlobales(formC);
         }
 
         if (data.usuarios && Array.isArray(data.usuarios)) {
@@ -180,7 +196,7 @@ export default function VisbackDashboard() {
   }, []);
 
   useEffect(() => {
-    if (activeTab === 'inicio' || activeTab === 'admin') {
+    if (activeTab === 'inicio' || activeTab === 'admin' || activeTab === 'compras') {
       sincronizarConGoogleSheets();
     }
   }, [activeTab]);
@@ -237,7 +253,6 @@ export default function VisbackDashboard() {
       alert("Completa todos los campos del cliente.");
       return;
     }
-    
     const nuevoCliente: Usuario = {
       email: String(adminNuevoEmail).trim().toLowerCase(),
       pass: adminNuevoPass,
@@ -246,9 +261,7 @@ export default function VisbackDashboard() {
       estado: adminNuevoEstado,
       saldo: 0.00
     };
-
     setUsuariosRegistrados(prev => [...prev, nuevoCliente]);
-
     try {
       await fetch(GOOGLE_SHEET_URL, {
         method: 'POST',
@@ -256,14 +269,11 @@ export default function VisbackDashboard() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'add_usuario', ...nuevoCliente })
       });
-    } catch (err) { 
-      console.error("Error al registrar cliente:", err); 
-    }
-
+    } catch (err) { console.error(err); }
     setAdminNuevoNombre('');
     setAdminNuevoEmail('');
     setAdminNuevoPass('');
-    alert("¡Cliente agregado con éxito a Google Sheets!");
+    alert("¡Cliente agregado con éxito!");
     setTimeout(sincronizarConGoogleSheets, 1000);
   };
 
@@ -292,7 +302,6 @@ export default function VisbackDashboard() {
       alert("Ingresa una cantidad válida de saldo.");
       return;
     }
-
     let saldoFinalCalculado = 0;
     const emailBuscado = String(email).trim().toLowerCase();
 
@@ -309,14 +318,12 @@ export default function VisbackDashboard() {
             localStorage.setItem('visback_usuario_actual', JSON.stringify(sesionActualizada));
           }
         }
-
         return { ...u, saldo: nuevoSaldo };
       }
       return u;
     });
 
     setUsuariosRegistrados(usuariosActualizados);
-
     try {
       await fetch(GOOGLE_SHEET_URL, {
         method: 'POST',
@@ -324,12 +331,10 @@ export default function VisbackDashboard() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'update_saldo', email: emailBuscado, saldo: saldoFinalCalculado })
       });
-    } catch (err) { 
-      console.error("Error al actualizar saldo en Sheets:", err); 
-    }
+    } catch (err) { console.error(err); }
 
     setCantidadesRecarga(prev => ({ ...prev, [email]: '' }));
-    alert(`¡Saldo actualizado correctamente a $${saldoFinalCalculado.toFixed(2)} MXN!`);
+    alert(`¡Saldo actualizado a $${saldoFinalCalculado.toFixed(2)} MXN!`);
     setTimeout(sincronizarConGoogleSheets, 800);
   };
 
@@ -358,12 +363,12 @@ export default function VisbackDashboard() {
     setNuevoProdNombre('');
     setNuevoProdDesc('');
     setNuevoProdPrecio('');
-    alert("¡Producto agregado con éxito!");
+    alert("¡Producto agregado!");
     setTimeout(sincronizarConGoogleSheets, 1000);
   };
 
   const eliminarProducto = async (id: string) => {
-    if (confirm("¿Estás seguro de eliminar este producto del catálogo?")) {
+    if (confirm("¿Eliminar este producto?")) {
       setProductos(prev => prev.filter(p => p.id !== id));
       try {
         await fetch(GOOGLE_SHEET_URL, {
@@ -373,7 +378,6 @@ export default function VisbackDashboard() {
           body: JSON.stringify({ action: 'delete_producto', id })
         });
       } catch (err) { console.error(err); }
-      alert("¡Producto eliminado del catálogo!");
       setTimeout(sincronizarConGoogleSheets, 1000);
     }
   };
@@ -404,7 +408,7 @@ export default function VisbackDashboard() {
     setCredCorreo('');
     setCredPass('');
     setCredPin('');
-    alert("¡Credencial agregada al inventario!");
+    alert("¡Credencial agregada!");
     setTimeout(sincronizarConGoogleSheets, 1000);
   };
 
@@ -467,11 +471,18 @@ export default function VisbackDashboard() {
     }
   };
 
-  // FUNCIÓN DE COMPRA BLINDADA CONTRA DOBLE CLIC (RACE CONDITION)
+  const calcularVencimiento = () => {
+    const fecha = new Date();
+    fecha.setDate(fecha.getDate() + 30);
+    const dia = String(fecha.getDate()).padStart(2, '0');
+    const mes = String(fecha.getMonth() + 1).padStart(2, '0');
+    const anio = fecha.getFullYear();
+    return `${dia}/${mes}/${anio}`;
+  };
+
   const ejecutarCompraFinal = async () => {
     if (!productoAConfirmar || !usuarioActual) return;
-    
-    if (procesandoCompra) return; // Bloquear si ya hay un proceso en marcha
+    if (procesandoCompra) return;
 
     if (usuarioActual.saldo < productoAConfirmar.precio) {
       alert("Saldo insuficiente.");
@@ -486,13 +497,12 @@ export default function VisbackDashboard() {
     );
 
     if (!credencialDisponible) {
-      alert("Lo sentimos, el stock se agotó hace un momento.");
+      alert("Lo sentimos, el stock se agotó.");
       setProductoAConfirmar(null);
       setProcesandoCompra(false);
       return;
     }
 
-    // Marcar de inmediato como vendida localmente para bloquear doble entrega
     setInventarioCredenciales(prev => prev.map(c => 
       c.id === credencialDisponible.id ? { ...c, estado: 'vendida' } : c
     ));
@@ -503,6 +513,20 @@ export default function VisbackDashboard() {
     localStorage.setItem('visback_usuario_actual', JSON.stringify(actualizado));
 
     setUsuariosRegistrados(prev => prev.map(u => u.email.toLowerCase() === usuarioActual.email.toLowerCase() ? { ...u, saldo: nuevoSaldo } : u));
+
+    const nuevaCompra: Compra = {
+      id: `#${Math.floor(100000 + Math.random() * 900000)}`,
+      email: usuarioActual.email.toLowerCase(),
+      producto: productoAConfirmar.nombre,
+      correo: credencialDisponible.correo,
+      pass: credencialDisponible.pass,
+      pin: credencialDisponible.pin,
+      precio: productoAConfirmar.precio,
+      vencimiento: calcularVencimiento(),
+      estado: 'Activa'
+    };
+
+    setComprasGlobales(prev => [nuevaCompra, ...prev]);
 
     try {
       await fetch(GOOGLE_SHEET_URL, {
@@ -518,22 +542,17 @@ export default function VisbackDashboard() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'update_saldo', email: usuarioActual.email, saldo: nuevoSaldo })
       });
+
+      await fetch(GOOGLE_SHEET_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'add_compra', ...nuevaCompra })
+      });
     } catch (err) { 
-      console.error("Error en transacción:", err); 
+      console.error("Error en compra:", err); 
     }
 
-    const nuevaCompra: Compra = {
-      id: `#${Math.floor(100000 + Math.random() * 900000)}`,
-      producto: productoAConfirmar.nombre,
-      correo: credencialDisponible.correo,
-      pass: credencialDisponible.pass,
-      pin: credencialDisponible.pin,
-      precio: productoAConfirmar.precio,
-      vencimiento: '24/10/2026',
-      estado: 'Activa'
-    };
-
-    setCompras(prev => [nuevaCompra, ...prev]);
     setProductoAConfirmar(null);
     setProcesandoCompra(false);
     setCompraExitosa(nuevaCompra);
@@ -580,6 +599,8 @@ export default function VisbackDashboard() {
       </div>
     );
   }
+
+  const misComprasFiltradas = comprasGlobales.filter(c => c.email === usuarioActual?.email.toLowerCase());
 
   return (
     <div className="flex h-screen bg-slate-50 font-sans text-slate-800">
@@ -635,10 +656,41 @@ export default function VisbackDashboard() {
             <div className="space-y-6">
               <div className="bg-gradient-to-r from-amber-600 to-orange-700 rounded-3xl p-6 text-white shadow-xl">
                 <h3 className="text-2xl font-bold">Panel de Administración 🛡️</h3>
-                <p className="text-amber-100 text-sm mt-1">Control total de productos, catálogo, inventario y saldos.</p>
+                <p className="text-amber-100 text-sm mt-1">Control de catálogo, inventario, clientes y auditoría de ventas.</p>
               </div>
 
-              {/* AGREGAR NUEVO CLIENTE DESDE ADMIN */}
+              {/* AUDITORÍA GLOBAL DE VENTAS */}
+              <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+                <h4 className="font-bold text-lg text-slate-800 flex items-center gap-2">
+                  <ShieldAlert size={20} className="text-amber-600" /> Auditoría de Ventas Globales ({comprasGlobales.length})
+                </h4>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm">
+                    <thead>
+                      <tr className="bg-slate-50 text-slate-500 font-bold uppercase border-b text-xs">
+                        <th className="p-3">Cliente (Comprador)</th>
+                        <th className="p-3">Servicio</th>
+                        <th className="p-3">Cuenta Entregada</th>
+                        <th className="p-3">Vence</th>
+                        <th className="p-3">Precio</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {comprasGlobales.map((venta, idx) => (
+                        <tr key={idx}>
+                          <td className="p-3 font-mono font-bold text-purple-600 text-xs">{venta.email}</td>
+                          <td className="p-3 font-semibold">{venta.producto}</td>
+                          <td className="p-3 font-mono text-xs">{venta.correo} / {venta.pass} {venta.pin !== 'N/A' && `(PIN: ${venta.pin})`}</td>
+                          <td className="p-3 font-mono text-xs text-slate-500">{venta.vencimiento}</td>
+                          <td className="p-3 font-bold text-emerald-600">${venta.precio.toFixed(2)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* REGISTRAR CLIENTE */}
               <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
                 <h4 className="font-bold text-lg text-slate-800 flex items-center gap-2">
                   <UserPlus size={20} className="text-purple-600" /> Registrar Nuevo Cliente Directamente
@@ -647,31 +699,27 @@ export default function VisbackDashboard() {
                   <input type="text" placeholder="Nombre completo" value={adminNuevoNombre} onChange={e => setAdminNuevoNombre(e.target.value)} className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm" />
                   <input type="email" placeholder="Correo electrónico" value={adminNuevoEmail} onChange={e => setAdminNuevoEmail(e.target.value)} className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm" />
                   <input type="password" placeholder="Contraseña" value={adminNuevoPass} onChange={e => setAdminNuevoPass(e.target.value)} className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm" />
-                  <button type="submit" className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2.5 rounded-xl text-sm cursor-pointer shadow-md">
-                    Crear Cuenta de Cliente
-                  </button>
+                  <button type="submit" className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2.5 rounded-xl text-sm cursor-pointer shadow-md">Crear Cuenta</button>
                 </form>
               </div>
 
-              {/* Agregar Producto */}
+              {/* AGREGAR PRODUCTO */}
               <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
                 <h4 className="font-bold text-lg text-slate-800 flex items-center gap-2">
                   <PlusCircle size={20} className="text-purple-600" /> Agregar Producto al Catálogo
                 </h4>
                 <form onSubmit={agregarProductoAdmin} className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <input type="text" placeholder="ID único (ej. netflix)" value={nuevoProdId} onChange={e => setNuevoProdId(e.target.value)} className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-mono" />
-                  <input type="text" placeholder="Nombre (ej. Netflix 1M)" value={nuevoProdNombre} onChange={e => setNuevoProdNombre(e.target.value)} className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm" />
+                  <input type="text" placeholder="ID único (ej. disney)" value={nuevoProdId} onChange={e => setNuevoProdId(e.target.value)} className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-mono" />
+                  <input type="text" placeholder="Nombre (ej. Disney+)" value={nuevoProdNombre} onChange={e => setNuevoProdNombre(e.target.value)} className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm" />
                   <input type="number" placeholder="Precio ($ MXN)" value={nuevoProdPrecio} onChange={e => setNuevoProdPrecio(e.target.value)} className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm" />
-                  <input type="text" placeholder="Descripción (ej. Respetar 1 dispositivo)" value={nuevoProdDesc} onChange={e => setNuevoProdDesc(e.target.value)} className="sm:col-span-3 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm" />
-                  <button type="submit" className="sm:col-span-3 bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 rounded-xl text-sm cursor-pointer shadow-md shadow-purple-600/20">Publicar Producto en la Tienda</button>
+                  <input type="text" placeholder="Descripción" value={nuevoProdDesc} onChange={e => setNuevoProdDesc(e.target.value)} className="sm:col-span-3 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm" />
+                  <button type="submit" className="sm:col-span-3 bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 rounded-xl text-sm cursor-pointer shadow-md">Publicar Producto</button>
                 </form>
               </div>
 
-              {/* LISTA DE PRODUCTOS EN EL CATÁLOGO CON BOTÓN DE ELIMINAR */}
+              {/* PRODUCTOS EN LA TIENDA */}
               <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-                <h4 className="font-bold text-lg text-slate-800 flex items-center gap-2">
-                  <ShoppingBag size={20} className="text-purple-600" /> Productos Actuales en la Tienda ({productos.length})
-                </h4>
+                <h4 className="font-bold text-lg text-slate-800">Productos en la Tienda ({productos.length})</h4>
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-sm">
                     <thead>
@@ -689,9 +737,7 @@ export default function VisbackDashboard() {
                           <td className="p-3 font-semibold">{p.nombre}</td>
                           <td className="p-3 font-bold">${p.precio.toFixed(2)} MXN</td>
                           <td className="p-3 text-center">
-                            <button onClick={() => eliminarProducto(p.id)} className="bg-red-100 text-red-600 hover:bg-red-200 px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition-all">
-                              Eliminar de la Tienda
-                            </button>
+                            <button onClick={() => eliminarProducto(p.id)} className="bg-red-100 text-red-600 hover:bg-red-200 px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer">Eliminar</button>
                           </td>
                         </tr>
                       ))}
@@ -700,49 +746,39 @@ export default function VisbackDashboard() {
                 </div>
               </div>
 
-              {/* Agregar Credencial Individual */}
+              {/* AGREGAR CREDENCIAL */}
               <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-                <h4 className="font-bold text-lg text-slate-800 flex items-center gap-2">
-                  <KeyRound size={20} className="text-amber-600" /> Agregar Cuenta Individual al Inventario
-                </h4>
+                <h4 className="font-bold text-lg text-slate-800">Agregar Cuenta al Inventario</h4>
                 <form onSubmit={agregarCredencialInventario} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                   <select value={credProdId} onChange={e => setCredProdId(e.target.value)} className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold">
                     {productos.map(p => (
-                      <option key={p.id} value={p.id}>{p.nombre} (ID: {p.id}) - Stock: {obtenerStock(p.id)}</option>
+                      <option key={p.id} value={p.id}>{p.nombre} (Stock: {obtenerStock(p.id)})</option>
                     ))}
                   </select>
                   <input type="text" placeholder="Correo" value={credCorreo} onChange={e => setCredCorreo(e.target.value)} className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm" />
                   <input type="text" placeholder="Contraseña" value={credPass} onChange={e => setCredPass(e.target.value)} className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm" />
-                  <input type="text" placeholder="PIN (Opcional)" value={credPin} onChange={e => setCredPin(e.target.value)} className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm" />
-                  <button type="submit" className="sm:col-span-2 lg:col-span-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl text-sm cursor-pointer shadow-md">Guardar Credencial y Aumentar Stock</button>
+                  <input type="text" placeholder="PIN" value={credPin} onChange={e => setCredPin(e.target.value)} className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm" />
+                  <button type="submit" className="sm:col-span-2 lg:col-span-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl text-sm cursor-pointer shadow-md">Guardar Cuenta y Aumentar Stock</button>
                 </form>
               </div>
 
-              {/* Carga Masiva */}
+              {/* CARGA MASIVA */}
               <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-                <h4 className="font-bold text-lg text-slate-800 flex items-center gap-2">
-                  <KeyRound size={20} className="text-purple-600" /> Carga Masiva de Credenciales
-                </h4>
+                <h4 className="font-bold text-lg text-slate-800">Carga Masiva de Cuentas</h4>
                 <form onSubmit={agregarCredencialMasiva} className="space-y-4">
-                  <div className="max-w-xs">
-                    <label className="block text-xs font-bold text-slate-700 mb-1">Seleccionar Servicio:</label>
-                    <select value={credProdId} onChange={e => setCredProdId(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold">
-                      {productos.map(p => (
-                        <option key={p.id} value={p.id}>{p.nombre} (Stock: {obtenerStock(p.id)})</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">Cuentas (Una por renglón: correo pass pin):</label>
-                    <textarea rows={4} placeholder="correo1@gmail.com pass123 1234&#10;correo2@gmail.com pass456 5678" value={textoMasivo} onChange={e => setTextoMasivo(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl p-4 text-xs font-mono" />
-                  </div>
+                  <select value={credProdId} onChange={e => setCredProdId(e.target.value)} className="w-full max-w-xs bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold">
+                    {productos.map(p => (
+                      <option key={p.id} value={p.id}>{p.nombre} (Stock: {obtenerStock(p.id)})</option>
+                    ))}
+                  </select>
+                  <textarea rows={4} placeholder="correo1@gmail.com pass123 1234&#10;correo2@gmail.com pass456 5678" value={textoMasivo} onChange={e => setTextoMasivo(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl p-4 text-xs font-mono" />
                   <button type="submit" className="bg-purple-600 hover:bg-purple-700 text-white font-bold px-6 py-3 rounded-xl text-sm cursor-pointer shadow-md">Cargar Masivamente</button>
                 </form>
               </div>
 
-              {/* Inventario Tabla */}
+              {/* INVENTARIO */}
               <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-                <h4 className="font-bold text-lg text-slate-800">Inventario Actual en la Nube ({inventarioCredenciales.length})</h4>
+                <h4 className="font-bold text-lg text-slate-800">Inventario Actual ({inventarioCredenciales.length})</h4>
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-sm">
                     <thead>
@@ -769,18 +805,16 @@ export default function VisbackDashboard() {
                 </div>
               </div>
 
-              {/* Gestión de Usuarios y Saldo */}
+              {/* GESTIÓN DE CLIENTES */}
               <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-                <h4 className="font-bold text-lg text-slate-800 flex items-center gap-2">
-                  <Users size={20} className="text-purple-600" /> Gestión de Clientes y Saldos ({usuariosRegistrados.length})
-                </h4>
+                <h4 className="font-bold text-lg text-slate-800">Gestión de Clientes ({usuariosRegistrados.length})</h4>
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-sm">
                     <thead>
                       <tr className="bg-slate-50 text-slate-500 font-bold uppercase border-b text-xs">
                         <th className="p-3">Nombre / Correo</th>
-                        <th className="p-3">Saldo Actual</th>
-                        <th className="p-3">Recargar / Ajustar Saldo</th>
+                        <th className="p-3">Saldo</th>
+                        <th className="p-3">Ajustar Saldo</th>
                         <th className="p-3 text-center">Acción</th>
                       </tr>
                     </thead>
@@ -854,37 +888,43 @@ export default function VisbackDashboard() {
                       <th className="p-3">Pedido</th>
                       <th className="p-3">Producto</th>
                       <th className="p-3">Credenciales</th>
-                      <th className="p-3">Vencimiento</th>
+                      <th className="p-3">Vencimiento (30 días)</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y">
-                    {compras.map(c => (
-                      <tr key={c.id}>
-                        <td className="p-3 font-bold">{c.id}</td>
-                        <td className="p-3 font-semibold">{c.producto}</td>
-                        <td className="p-3 font-mono text-xs space-y-1">
-                          <div className="flex items-center justify-between bg-slate-50 p-1.5 rounded-lg border">
-                            <span>Correo: <strong>{c.correo}</strong></span>
-                            <button onClick={() => { navigator.clipboard.writeText(c.correo); alert("¡Copiado!"); }} className="bg-purple-100 hover:bg-purple-200 text-purple-700 px-2 py-0.5 rounded text-[10px] font-bold cursor-pointer">Copiar</button>
-                          </div>
-                          <div className="flex items-center justify-between bg-slate-50 p-1.5 rounded-lg border">
-                            <span>Pass: <strong>{c.pass}</strong></span>
-                            <button onClick={() => { navigator.clipboard.writeText(c.pass); alert("¡Copiado!"); }} className="bg-purple-100 hover:bg-purple-200 text-purple-700 px-2 py-0.5 rounded text-[10px] font-bold cursor-pointer">Copiar</button>
-                          </div>
-                          {c.pin !== 'N/A' && (
-                            <div className="flex items-center justify-between bg-slate-50 p-1.5 rounded-lg border">
-                              <span>PIN: <strong className="text-purple-600">{c.pin}</strong></span>
-                              <button onClick={() => { navigator.clipboard.writeText(c.pin); alert("¡Copiado!"); }} className="bg-purple-100 hover:bg-purple-200 text-purple-700 px-2 py-0.5 rounded text-[10px] font-bold cursor-pointer">Copiar</button>
-                            </div>
-                          )}
-                        </td>
-                        <td className="p-3">
-                          <span className="bg-amber-50 text-amber-800 px-3 py-1.5 rounded-xl text-xs font-bold border border-amber-200 flex items-center gap-1 w-max">
-                            <Clock size={14} /> {c.vencimiento}
-                          </span>
-                        </td>
+                    {misComprasFiltradas.length === 0 ? (
+                      <tr>
+                        <td colSpan={4} className="p-6 text-center text-slate-400 text-sm">Aún no tienes compras registradas.</td>
                       </tr>
-                    ))}
+                    ) : (
+                      misComprasFiltradas.map(c => (
+                        <tr key={c.id}>
+                          <td className="p-3 font-bold">{c.id}</td>
+                          <td className="p-3 font-semibold">{c.producto}</td>
+                          <td className="p-3 font-mono text-xs space-y-1">
+                            <div className="flex items-center justify-between bg-slate-50 p-1.5 rounded-lg border">
+                              <span>Correo: <strong>{c.correo}</strong></span>
+                              <button onClick={() => { navigator.clipboard.writeText(c.correo); alert("¡Copiado!"); }} className="bg-purple-100 hover:bg-purple-200 text-purple-700 px-2 py-0.5 rounded text-[10px] font-bold cursor-pointer">Copiar</button>
+                            </div>
+                            <div className="flex items-center justify-between bg-slate-50 p-1.5 rounded-lg border">
+                              <span>Pass: <strong>{c.pass}</strong></span>
+                              <button onClick={() => { navigator.clipboard.writeText(c.pass); alert("¡Copiado!"); }} className="bg-purple-100 hover:bg-purple-200 text-purple-700 px-2 py-0.5 rounded text-[10px] font-bold cursor-pointer">Copiar</button>
+                            </div>
+                            {c.pin !== 'N/A' && (
+                              <div className="flex items-center justify-between bg-slate-50 p-1.5 rounded-lg border">
+                                <span>PIN: <strong className="text-purple-600">{c.pin}</strong></span>
+                                <button onClick={() => { navigator.clipboard.writeText(c.pin); alert("¡Copiado!"); }} className="bg-purple-100 hover:bg-purple-200 text-purple-700 px-2 py-0.5 rounded text-[10px] font-bold cursor-pointer">Copiar</button>
+                              </div>
+                            )}
+                          </td>
+                          <td className="p-3">
+                            <span className="bg-amber-50 text-amber-800 px-3 py-1.5 rounded-xl text-xs font-bold border border-amber-200 flex items-center gap-1 w-max">
+                              <Clock size={14} /> {c.vencimiento}
+                            </span>
+                          </td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -911,18 +951,8 @@ export default function VisbackDashboard() {
             <h3 className="text-lg font-extrabold">Confirmar Compra</h3>
             <p className="text-sm">¿Deseas comprar <strong>{productoAConfirmar.nombre}</strong> por ${productoAConfirmar.precio.toFixed(2)} MXN?</p>
             <div className="flex gap-3 pt-2">
-              <button 
-                onClick={() => setProductoAConfirmar(null)} 
-                disabled={procesandoCompra}
-                className="flex-1 bg-slate-200 hover:bg-slate-300 py-2.5 rounded-xl font-bold text-sm cursor-pointer"
-              >
-                No
-              </button>
-              <button 
-                onClick={ejecutarCompraFinal} 
-                disabled={procesandoCompra}
-                className={`flex-1 py-2.5 rounded-xl font-bold text-sm text-white shadow-md transition-all ${procesandoCompra ? 'bg-purple-400 cursor-wait' : 'bg-purple-600 hover:bg-purple-700 cursor-pointer'}`}
-              >
+              <button onClick={() => setProductoAConfirmar(null)} disabled={procesandoCompra} className="flex-1 bg-slate-200 hover:bg-slate-300 py-2.5 rounded-xl font-bold text-sm cursor-pointer">No</button>
+              <button onClick={ejecutarCompraFinal} disabled={procesandoCompra} className={`flex-1 py-2.5 rounded-xl font-bold text-sm text-white shadow-md transition-all ${procesandoCompra ? 'bg-purple-400 cursor-wait' : 'bg-purple-600 hover:bg-purple-700 cursor-pointer'}`}>
                 {procesandoCompra ? 'Procesando...' : 'Sí'}
               </button>
             </div>
@@ -941,6 +971,7 @@ export default function VisbackDashboard() {
               <div>Correo: <strong>{compraExitosa.correo}</strong></div>
               <div>Contraseña: <strong>{compraExitosa.pass}</strong></div>
               {compraExitosa.pin !== 'N/A' && <div>PIN: <strong className="text-purple-600">{compraExitosa.pin}</strong></div>}
+              <div className="text-amber-700 pt-1">Vence: <strong>{compraExitosa.vencimiento}</strong></div>
             </div>
             <button onClick={() => setCompraExitosa(null)} className="w-full bg-purple-600 hover:bg-purple-700 text-white py-3 rounded-2xl font-bold text-sm cursor-pointer shadow-md">Aceptar</button>
           </div>
