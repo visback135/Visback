@@ -341,23 +341,25 @@ export default function VisbackDashboard() {
     }
   };
 
-  const ajustarSaldoUsuario = async (email: string, tipo: 'agregar' | 'quitar') => {
-    const montoStr = cantidadesRecarga[email];
+  const ajustarSaldoUsuario = async (emailOriginal: string, tipo: 'agregar' | 'quitar') => {
+    const emailBuscado = String(emailOriginal || '').trim().toLowerCase();
+    const montoStr = cantidadesRecarga[emailOriginal] || cantidadesRecarga[emailBuscado];
     const monto = parseFloat(montoStr);
+
     if (!monto || isNaN(monto) || monto <= 0) {
       alert("Ingresa una cantidad válida de saldo.");
       return;
     }
+
     let saldoFinalCalculado = 0;
-    const emailBuscado = String(email).trim().toLowerCase();
 
     const usuariosActualizados = usuariosRegistrados.map(u => {
-      if (String(u.email).trim().toLowerCase() === emailBuscado) {
+      if (String(u.email || '').trim().toLowerCase() === emailBuscado) {
         let nuevoSaldo = tipo === 'agregar' ? u.saldo + monto : u.saldo - monto;
         if (nuevoSaldo < 0) nuevoSaldo = 0;
         saldoFinalCalculado = nuevoSaldo;
 
-        if (usuarioActual && String(usuarioActual.email).trim().toLowerCase() === emailBuscado) {
+        if (usuarioActual && String(usuarioActual.email || '').trim().toLowerCase() === emailBuscado) {
           const sesionActualizada = { ...u, saldo: nuevoSaldo };
           setUsuarioActual(sesionActualizada);
           if (typeof window !== 'undefined') {
@@ -398,7 +400,7 @@ export default function VisbackDashboard() {
       });
     } catch (err) { console.error(err); }
 
-    setCantidadesRecarga(prev => ({ ...prev, [email]: '' }));
+    setCantidadesRecarga(prev => ({ ...prev, [emailOriginal]: '', [emailBuscado]: '' }));
     alert(`¡Saldo actualizado a $${saldoFinalCalculado.toFixed(2)} MXN y registrado en billetera!`);
     setTimeout(sincronizarConGoogleSheets, 800);
   };
@@ -682,8 +684,8 @@ export default function VisbackDashboard() {
     );
   }
 
-  const misComprasFiltradas = comprasGlobales.filter(c => c.email === usuarioActual?.email.toLowerCase());
-  const misTransaccionesFiltradas = transaccionesGlobales.filter(t => t.email === usuarioActual?.email.toLowerCase());
+  const misComprasFiltradas = comprasGlobales.filter(c => String(c.email).trim().toLowerCase() === String(usuarioActual?.email || '').trim().toLowerCase());
+  const misTransaccionesFiltradas = transaccionesGlobales.filter(t => String(t.email).trim().toLowerCase() === String(usuarioActual?.email || '').trim().toLowerCase());
 
   // Filtrado y Paginación de Auditoría de Ventas
   const ventasFiltradasBusqueda = comprasGlobales.filter(v => {
