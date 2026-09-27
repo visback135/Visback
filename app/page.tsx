@@ -26,7 +26,8 @@ import {
   ArrowUpRight,
   ArrowDownLeft,
   HelpCircle,
-  Send
+  Send,
+  AlertCircle
 } from 'lucide-react';
 
 interface Producto {
@@ -68,9 +69,11 @@ interface TransaccionBilletera {
 interface ReporteSoporte {
   id: string;
   email: string;
+  cuenta_correo: string;
+  cuenta_pass: string;
   mensaje: string;
   respuesta: string;
-  estado: 'En proceso' | 'Solucionado';
+  estado: 'En proceso' | 'Solucionado' | 'Rechazado';
   fecha: string;
 }
 
@@ -114,12 +117,15 @@ export default function VisbackDashboard() {
   const [transaccionesGlobales, setTransaccionesGlobales] = useState<TransaccionBilletera[]>([]);
   const [reportesGlobales, setReportesGlobales] = useState<ReporteSoporte[]>([]);
 
-  // Estado para nuevo reporte del cliente
-  const [nuevoReporteMsg, setNuevoReporteMsg] = useState('');
-  // Estados de respuestas de admin en tiempo real por ID de reporte
+  // Campos para el nuevo reporte del cliente
+  const [reporteCuentaCorreo, setReporteCuentaCorreo] = useState('');
+  const [reporteCuentaPass, setReporteCuentaPass] = useState('');
+  const [reporteMensaje, setReporteMensaje] = useState('');
+
+  // Respuestas del admin por ID
   const [respuestasAdmin, setRespuestasAdmin] = useState<{ [key: string]: string }>({});
 
-  // Estados para Acordeones (Plegables) en Admin
+  // Acordeones Admin
   const [mostrarAuditoria, setMostrarAuditoria] = useState(true);
   const [mostrarReportesAdmin, setMostrarReportesAdmin] = useState(true);
   const [mostrarCrearCliente, setMostrarCrearCliente] = useState(false);
@@ -130,13 +136,11 @@ export default function VisbackDashboard() {
   const [mostrarInventario, setMostrarInventario] = useState(true);
   const [mostrarClientes, setMostrarClientes] = useState(true);
 
-  // Buscadores y Paginación (15 por página)
+  // Buscadores y Paginación
   const [busquedaVentas, setBusquedaVentas] = useState('');
   const [paginaVentas, setPaginaVentas] = useState(1);
-
   const [busquedaInventario, setBusquedaInventario] = useState('');
   const [paginaInventario, setPaginaInventario] = useState(1);
-
   const itemsPorPagina = 15;
 
   const [productoAConfirmar, setProductoAConfirmar] = useState<Producto | null>(null);
@@ -216,9 +220,11 @@ export default function VisbackDashboard() {
           const formR: ReporteSoporte[] = data.reportes.map((r: any) => ({
             id: String(r.id || ''),
             email: String(r.email || '').trim().toLowerCase(),
+            cuenta_correo: String(r.cuenta_correo || ''),
+            cuenta_pass: String(r.cuenta_pass || ''),
             mensaje: String(r.mensaje || ''),
             respuesta: String(r.respuesta || ''),
-            estado: (String(r.estado || '').trim() === 'Solucionado' ? 'Solucionado' : 'En proceso'),
+            estado: (String(r.estado || '').trim() === 'Solucionado' ? 'Solucionado' : String(r.estado || '').trim() === 'Rechazado' ? 'Rechazado' : 'En proceso'),
             fecha: String(r.fecha || '')
           }));
           setReportesGlobales(formR);
@@ -325,20 +331,27 @@ export default function VisbackDashboard() {
 
   const enviarReporteCliente = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!nuevoReporteMsg.trim() || !usuarioActual) return;
+    if (!reporteCuentaCorreo.trim() || !reporteCuentaPass.trim() || !reporteMensaje.trim() || !usuarioActual) {
+      alert("Por favor completa el correo, la contraseña y describe el problema.");
+      return;
+    }
 
     const fechaHoy = new Date().toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
     const nuevoReporte: ReporteSoporte = {
       id: `#R${Math.floor(100000 + Math.random() * 900000)}`,
       email: usuarioActual.email.toLowerCase(),
-      mensaje: nuevoReporteMsg.trim(),
+      cuenta_correo: reporteCuentaCorreo.trim(),
+      cuenta_pass: reporteCuentaPass.trim(),
+      mensaje: reporteMensaje.trim(),
       respuesta: '',
       estado: 'En proceso',
       fecha: fechaHoy
     };
 
     setReportesGlobales(prev => [nuevoReporte, ...prev]);
-    setNuevoReporteMsg('');
+    setReporteCuentaCorreo('');
+    setReporteCuentaPass('');
+    setReporteMensaje('');
 
     try {
       await fetch(GOOGLE_SHEET_URL, {
@@ -347,14 +360,14 @@ export default function VisbackDashboard() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'add_reporte', ...nuevoReporte })
       });
-      alert("¡Reporte enviado con éxito! El administrador te responderá pronto.");
+      alert("¡Reporte enviado con éxito al administrador!");
     } catch (err) {
       console.error(err);
     }
     setTimeout(sincronizarConGoogleSheets, 1000);
   };
 
-  const responderReporteAdmin = async (idReporte: string, estadoNuevo: 'En proceso' | 'Solucionado') => {
+  const responderReporteAdmin = async (idReporte: string, estadoNuevo: 'En proceso' | 'Solucionado' | 'Rechazado') => {
     const textoRespuesta = respuestasAdmin[idReporte] || '';
     
     setReportesGlobales(prev => prev.map(r => {
@@ -378,7 +391,7 @@ export default function VisbackDashboard() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'update_reporte', id: idReporte, respuesta: respuestaFinal, estado: estadoNuevo })
       });
-      alert(`¡Reporte ${idReporte} actualizado correctamente!`);
+      alert(`¡Reporte ${idReporte} actualizado a ${estadoNuevo}!`);
     } catch (err) {
       console.error(err);
     }
@@ -780,7 +793,7 @@ export default function VisbackDashboard() {
   const misTransaccionesFiltradas = transaccionesGlobales.filter(t => String(t.email).trim().toLowerCase() === String(usuarioActual?.email || '').trim().toLowerCase());
   const misReportesFiltrados = reportesGlobales.filter(r => String(r.email).trim().toLowerCase() === String(usuarioActual?.email || '').trim().toLowerCase());
 
-  // Filtrado y Paginación de Auditoría de Ventas
+  // Auditoría ventas
   const ventasFiltradasBusqueda = comprasGlobales.filter(v => {
     const q = busquedaVentas.toLowerCase();
     return v.email.toLowerCase().includes(q) || v.producto.toLowerCase().includes(q) || v.correo.toLowerCase().includes(q) || v.pass.toLowerCase().includes(q) || v.vencimiento.toLowerCase().includes(q);
@@ -788,7 +801,7 @@ export default function VisbackDashboard() {
   const totalPaginasVentas = Math.ceil(ventasFiltradasBusqueda.length / itemsPorPagina) || 1;
   const ventasPaginadas = ventasFiltradasBusqueda.slice((paginaVentas - 1) * itemsPorPagina, paginaVentas * itemsPorPagina);
 
-  // Filtrado y Paginación de Inventario Actual
+  // Inventario
   const inventarioFiltradoBusqueda = inventarioCredenciales.filter(i => {
     const q = busquedaInventario.toLowerCase();
     return i.productoId.toLowerCase().includes(q) || i.correo.toLowerCase().includes(q) || i.pass.toLowerCase().includes(q) || i.estado.toLowerCase().includes(q);
@@ -821,9 +834,11 @@ export default function VisbackDashboard() {
             <button onClick={() => { setActiveTab('billetera'); setMenuAbierto(false); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium ${activeTab === 'billetera' ? 'bg-purple-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-900'}`}>
               <Wallet size={20} /> Billetera
             </button>
-            <button onClick={() => { setActiveTab('reportes'); setMenuAbierto(false); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium ${activeTab === 'reportes' ? 'bg-purple-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-900'}`}>
-              <HelpCircle size={20} /> Soporte / Reportes
-            </button>
+            {usuarioActual?.rol !== 'admin' && (
+              <button onClick={() => { setActiveTab('reportes'); setMenuAbierto(false); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium ${activeTab === 'reportes' ? 'bg-purple-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-900'}`}>
+                <HelpCircle size={20} /> Soporte / Reportar Cuenta
+              </button>
+            )}
           </nav>
         </div>
         <button onClick={() => { setUsuarioActual(null); setViewMode('login'); localStorage.removeItem('visback_usuario_actual'); }} className="w-full bg-red-600/10 text-red-500 hover:bg-red-600 hover:text-white py-3 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 transition-all">
@@ -853,14 +868,14 @@ export default function VisbackDashboard() {
             <div className="space-y-6">
               <div className="bg-gradient-to-r from-amber-600 to-orange-700 rounded-3xl p-6 text-white shadow-xl">
                 <h3 className="text-2xl font-bold">Panel de Administración 🛡️</h3>
-                <p className="text-amber-100 text-sm mt-1">Control de catálogo, inventario, clientes y auditoría de ventas.</p>
+                <p className="text-amber-100 text-sm mt-1">Control de catálogo, inventario, clientes, reportes y ventas.</p>
               </div>
 
-              {/* GESTIÓN DE REPORTES Y SOPORTE (ADMIN) */}
+              {/* GESTIÓN DE REPORTES DE CLIENTES (ADMIN) */}
               <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
                 <div onClick={() => setMostrarReportesAdmin(!mostrarReportesAdmin)} className="p-6 bg-slate-50 border-b border-slate-200 flex justify-between items-center cursor-pointer select-none">
                   <h4 className="font-bold text-lg text-slate-800 flex items-center gap-2">
-                    <HelpCircle size={20} className="text-amber-600" /> Reportes de Clientes ({reportesGlobales.length})
+                    <HelpCircle size={20} className="text-amber-600" /> Reportes de Cuentas de Clientes ({reportesGlobales.length})
                   </h4>
                   <button className="text-slate-500 font-bold text-xs flex items-center gap-1 bg-white border border-slate-200 px-3 py-1.5 rounded-xl shadow-xs">
                     {mostrarReportesAdmin ? 'Ocultar' : 'Mostrar'} {mostrarReportesAdmin ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
@@ -877,38 +892,37 @@ export default function VisbackDashboard() {
                           <div key={rep.id} className="border border-slate-200 rounded-2xl p-4 bg-slate-50/50 space-y-3">
                             <div className="flex justify-between items-start">
                               <div>
-                                <span className="font-mono font-bold text-purple-600 text-xs">{rep.email}</span>
+                                <span className="font-bold text-slate-800 text-xs">Cliente: <strong className="text-purple-600">{rep.email}</strong></span>
                                 <span className="text-slate-400 text-xs ml-3">{rep.fecha}</span>
                               </div>
-                              <span className={`px-3 py-1 rounded-full text-xs font-bold ${rep.estado === 'Solucionado' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-800'}`}>
+                              <span className={`px-3 py-1 rounded-full text-xs font-bold ${rep.estado === 'Solucionado' ? 'bg-emerald-100 text-emerald-700' : rep.estado === 'Rechazado' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-800'}`}>
                                 {rep.estado}
                               </span>
                             </div>
-                            <div className="text-sm font-medium bg-white p-3 rounded-xl border border-slate-200 text-slate-700">
-                              💬 <strong>Problema:</strong> {rep.mensaje}
+
+                            {/* Datos de la cuenta reportada */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 bg-white p-3 rounded-xl border border-slate-200 font-mono text-xs">
+                              <div>Correo de cuenta: <strong>{rep.cuenta_correo}</strong></div>
+                              <div>Contraseña de cuenta: <strong>{rep.cuenta_pass}</strong></div>
                             </div>
+
+                            <div className="text-sm font-medium bg-white p-3 rounded-xl border border-slate-200 text-slate-700">
+                              💬 <strong>Problema reportado:</strong> {rep.mensaje}
+                            </div>
+
                             <div className="space-y-2 pt-2">
-                              <label className="text-xs font-bold text-slate-500">Responder al cliente:</label>
-                              <div className="flex gap-2">
+                              <label className="text-xs font-bold text-slate-500">Respuesta para el cliente:</label>
+                              <div className="flex flex-wrap gap-2">
                                 <input 
                                   type="text" 
                                   placeholder="Escribe la solución..." 
                                   defaultValue={rep.respuesta}
                                   onChange={e => setRespuestasAdmin({ ...respuestasAdmin, [rep.id]: e.target.value })}
-                                  className="flex-1 bg-white border border-slate-200 rounded-xl px-4 py-2 text-xs focus:outline-none focus:border-amber-500 font-medium"
+                                  className="flex-1 min-w-[200px] bg-white border border-slate-200 rounded-xl px-4 py-2 text-xs focus:outline-none focus:border-amber-500 font-medium"
                                 />
-                                <button 
-                                  onClick={() => responderReporteAdmin(rep.id, 'En proceso')} 
-                                  className="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-xl text-xs font-bold cursor-pointer"
-                                >
-                                  Guardar
-                                </button>
-                                <button 
-                                  onClick={() => responderReporteAdmin(rep.id, 'Solucionado')} 
-                                  className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-xs font-bold cursor-pointer flex items-center gap-1"
-                                >
-                                  <CheckCircle2 size={14} /> Solucionado
-                                </button>
+                                <button onClick={() => responderReporteAdmin(rep.id, 'En proceso')} className="bg-amber-500 hover:bg-amber-600 text-white px-3 py-2 rounded-xl text-xs font-bold cursor-pointer">En Proceso</button>
+                                <button onClick={() => responderReporteAdmin(rep.id, 'Solucionado')} className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-xl text-xs font-bold cursor-pointer flex items-center gap-1"><CheckCircle2 size={14} /> Solucionado</button>
+                                <button onClick={() => responderReporteAdmin(rep.id, 'Rechazado')} className="bg-rose-600 hover:bg-rose-700 text-white px-3 py-2 rounded-xl text-xs font-bold cursor-pointer">Rechazado</button>
                               </div>
                             </div>
                           </div>
@@ -1346,33 +1360,58 @@ export default function VisbackDashboard() {
             </div>
           )}
 
-          {activeTab === 'reportes' && (
+          {activeTab === 'reportes' && usuarioActual?.rol !== 'admin' && (
             <div className="space-y-6">
               <div className="bg-gradient-to-r from-purple-700 to-indigo-800 rounded-3xl p-6 text-white shadow-xl">
-                <h3 className="text-2xl font-bold">Soporte y Reportes 🛠️</h3>
-                <p className="text-purple-200 text-sm mt-1">¿Tienes algún problema con tu cuenta o servicio? Repórtalo aquí y te atenderemos enseguida.</p>
+                <h3 className="text-2xl font-bold">Reportar Cuenta con Falla 🛠️</h3>
+                <p className="text-purple-200 text-sm mt-1">Ingresa los datos de la cuenta que te está fallando y detalla el problema para revisarla.</p>
               </div>
 
-              {/* ENVIAR NUEVO REPORTE */}
+              {/* ENVIAR NUEVO REPORTE CON LOS 3 CAMPOS */}
               <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-4">
-                <h4 className="font-bold text-lg text-slate-800">Crear Nuevo Reporte</h4>
+                <h4 className="font-bold text-lg text-slate-800">Detalles del Reporte</h4>
                 <form onSubmit={enviarReporteCliente} className="space-y-4">
-                  <textarea 
-                    rows={3} 
-                    placeholder="Describe tu problema (ej. Mi cuenta de Netflix pide código o cerró sesión)..." 
-                    value={nuevoReporteMsg}
-                    onChange={e => setNuevoReporteMsg(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-4 text-sm focus:outline-none focus:border-purple-500"
-                  />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-slate-600">Correo de la cuenta:</label>
+                      <input 
+                        type="text" 
+                        placeholder="ej. cuenta@netflix.com" 
+                        value={reporteCuentaCorreo}
+                        onChange={e => setReporteCuentaCorreo(e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-mono focus:outline-none focus:border-purple-500"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-slate-600">Contraseña de la cuenta:</label>
+                      <input 
+                        type="text" 
+                        placeholder="ej. password123" 
+                        value={reporteCuentaPass}
+                        onChange={e => setReporteCuentaPass(e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-mono focus:outline-none focus:border-purple-500"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-600">Explica el problema:</label>
+                    <textarea 
+                      rows={3} 
+                      placeholder="Describe qué pasa (ej. Pide código de hogar, la contraseña cambió, etc.)..." 
+                      value={reporteMensaje}
+                      onChange={e => setReporteMensaje(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl p-4 text-sm focus:outline-none focus:border-purple-500"
+                    />
+                  </div>
                   <button type="submit" className="bg-purple-600 hover:bg-purple-700 text-white font-bold px-6 py-3 rounded-xl text-sm cursor-pointer shadow-md flex items-center gap-2">
-                    <Send size={16} /> Enviar Reporte
+                    <Send size={16} /> Enviar Reporte al Admin
                   </button>
                 </form>
               </div>
 
               {/* MIS REPORTES ENVIADOS */}
               <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-4">
-                <h4 className="font-bold text-lg text-slate-800">Mis Reportes y Respuestas del Admin</h4>
+                <h4 className="font-bold text-lg text-slate-800">Historial de Mis Reportes</h4>
                 <div className="space-y-4">
                   {misReportesFiltrados.length === 0 ? (
                     <p className="text-slate-400 text-sm py-4 text-center">No has enviado ningún reporte todavía.</p>
@@ -1381,12 +1420,13 @@ export default function VisbackDashboard() {
                       <div key={idx} className="border border-slate-200 rounded-2xl p-5 bg-slate-50/50 space-y-3">
                         <div className="flex justify-between items-center">
                           <span className="font-mono text-xs text-slate-400">{rep.id} - {rep.fecha}</span>
-                          <span className={`px-3 py-1 rounded-full text-xs font-bold ${rep.estado === 'Solucionado' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-800'}`}>
+                          <span className={`px-3 py-1 rounded-full text-xs font-bold ${rep.estado === 'Solucionado' ? 'bg-emerald-100 text-emerald-700' : rep.estado === 'Rechazado' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-800'}`}>
                             {rep.estado}
                           </span>
                         </div>
-                        <div className="text-sm font-semibold text-slate-800 bg-white p-3 rounded-xl border">
-                          💬 <strong>Tu mensaje:</strong> {rep.mensaje}
+                        <div className="bg-white p-3 rounded-xl border font-mono text-xs text-slate-700 space-y-1">
+                          <div>Cuenta reportada: <strong>{rep.cuenta_correo}</strong> / <strong>{rep.cuenta_pass}</strong></div>
+                          <div>Problema: <strong>{rep.mensaje}</strong></div>
                         </div>
                         {rep.respuesta ? (
                           <div className="text-sm text-emerald-900 bg-emerald-50 p-3 rounded-xl border border-emerald-200">
@@ -1394,7 +1434,7 @@ export default function VisbackDashboard() {
                           </div>
                         ) : (
                           <div className="text-xs text-amber-600 italic">
-                            ⏳ Tu reporte está siendo revisado por el administrador.
+                            ⏳ Tu reporte está en proceso de revisión por el administrador.
                           </div>
                         )}
                       </div>
