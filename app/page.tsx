@@ -71,6 +71,7 @@ interface ReporteSoporte {
   email: string;
   cuenta_correo: string;
   cuenta_pass: string;
+  tipo_cuenta: 'Completa' | 'Perfil';
   mensaje: string;
   respuesta: string;
   estado: 'En proceso' | 'Solucionado' | 'Rechazado';
@@ -104,7 +105,7 @@ export default function VisbackDashboard() {
   const [adminNuevoEstado, setAdminNuevoEstado] = useState<'activo' | 'pendiente'>('activo');
 
   const [usuarioActual, setUsuarioActual] = useState<Usuario | null>(null);
-  const [activeTab, setActiveTab] = useState<'inicio' | 'compras' | 'billetera' | 'reportes' | 'admin'>('inicio');
+  const [activeTab, setActiveTab] = useState<'inicio' | 'compras' | 'billetera' | 'reportes' | 'admin' | 'admin_reportes'>('inicio');
   const [menuAbierto, setMenuAbierto] = useState(false);
 
   const [usuariosRegistrados, setUsuariosRegistrados] = useState<Usuario[]>([]);
@@ -117,9 +118,10 @@ export default function VisbackDashboard() {
   const [transaccionesGlobales, setTransaccionesGlobales] = useState<TransaccionBilletera[]>([]);
   const [reportesGlobales, setReportesGlobales] = useState<ReporteSoporte[]>([]);
 
-  // Campos para el nuevo reporte del cliente
+  // Campos para el reporte del cliente
   const [reporteCuentaCorreo, setReporteCuentaCorreo] = useState('');
   const [reporteCuentaPass, setReporteCuentaPass] = useState('');
+  const [reporteTipoCuenta, setReporteTipoCuenta] = useState<'Completa' | 'Perfil'>('Completa');
   const [reporteMensaje, setReporteMensaje] = useState('');
 
   // Respuestas del admin por ID
@@ -127,7 +129,6 @@ export default function VisbackDashboard() {
 
   // Acordeones Admin
   const [mostrarAuditoria, setMostrarAuditoria] = useState(true);
-  const [mostrarReportesAdmin, setMostrarReportesAdmin] = useState(true);
   const [mostrarCrearCliente, setMostrarCrearCliente] = useState(false);
   const [mostrarCrearProd, setMostrarCrearProd] = useState(false);
   const [mostrarListaProd, setMostrarListaProd] = useState(true);
@@ -222,6 +223,7 @@ export default function VisbackDashboard() {
             email: String(r.email || '').trim().toLowerCase(),
             cuenta_correo: String(r.cuenta_correo || ''),
             cuenta_pass: String(r.cuenta_pass || ''),
+            tipo_cuenta: (String(r.tipo_cuenta || '').trim() === 'Perfil' ? 'Perfil' : 'Completa'),
             mensaje: String(r.mensaje || ''),
             respuesta: String(r.respuesta || ''),
             estado: (String(r.estado || '').trim() === 'Solucionado' ? 'Solucionado' : String(r.estado || '').trim() === 'Rechazado' ? 'Rechazado' : 'En proceso'),
@@ -278,7 +280,7 @@ export default function VisbackDashboard() {
   }, []);
 
   useEffect(() => {
-    if (activeTab === 'inicio' || activeTab === 'admin' || activeTab === 'compras' || activeTab === 'billetera' || activeTab === 'reportes') {
+    if (activeTab === 'inicio' || activeTab === 'admin' || activeTab === 'admin_reportes' || activeTab === 'compras' || activeTab === 'billetera' || activeTab === 'reportes') {
       sincronizarConGoogleSheets();
     }
   }, [activeTab]);
@@ -342,6 +344,7 @@ export default function VisbackDashboard() {
       email: usuarioActual.email.toLowerCase(),
       cuenta_correo: reporteCuentaCorreo.trim(),
       cuenta_pass: reporteCuentaPass.trim(),
+      tipo_cuenta: reporteTipoCuenta,
       mensaje: reporteMensaje.trim(),
       respuesta: '',
       estado: 'En proceso',
@@ -351,6 +354,7 @@ export default function VisbackDashboard() {
     setReportesGlobales(prev => [nuevoReporte, ...prev]);
     setReporteCuentaCorreo('');
     setReporteCuentaPass('');
+    setReporteTipoCuenta('Completa');
     setReporteMensaje('');
 
     try {
@@ -821,9 +825,14 @@ export default function VisbackDashboard() {
           </div>
           <nav className="space-y-2">
             {usuarioActual?.rol === 'admin' && (
-              <button onClick={() => { setActiveTab('admin'); setMenuAbierto(false); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium ${activeTab === 'admin' ? 'bg-amber-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-900'}`}>
-                <Users size={20} /> Panel Admin
-              </button>
+              <>
+                <button onClick={() => { setActiveTab('admin'); setMenuAbierto(false); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium ${activeTab === 'admin' ? 'bg-amber-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-900'}`}>
+                  <Users size={20} /> Panel Admin
+                </button>
+                <button onClick={() => { setActiveTab('admin_reportes'); setMenuAbierto(false); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium ${activeTab === 'admin_reportes' ? 'bg-amber-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-900'}`}>
+                  <HelpCircle size={20} /> Reportes Clientes ({reportesGlobales.length})
+                </button>
+              </>
             )}
             <button onClick={() => { setActiveTab('inicio'); setMenuAbierto(false); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium ${activeTab === 'inicio' ? 'bg-purple-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-900'}`}>
               <ShoppingBag size={20} /> Catálogo
@@ -868,69 +877,7 @@ export default function VisbackDashboard() {
             <div className="space-y-6">
               <div className="bg-gradient-to-r from-amber-600 to-orange-700 rounded-3xl p-6 text-white shadow-xl">
                 <h3 className="text-2xl font-bold">Panel de Administración 🛡️</h3>
-                <p className="text-amber-100 text-sm mt-1">Control de catálogo, inventario, clientes, reportes y ventas.</p>
-              </div>
-
-              {/* GESTIÓN DE REPORTES DE CLIENTES (ADMIN) */}
-              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                <div onClick={() => setMostrarReportesAdmin(!mostrarReportesAdmin)} className="p-6 bg-slate-50 border-b border-slate-200 flex justify-between items-center cursor-pointer select-none">
-                  <h4 className="font-bold text-lg text-slate-800 flex items-center gap-2">
-                    <HelpCircle size={20} className="text-amber-600" /> Reportes de Cuentas de Clientes ({reportesGlobales.length})
-                  </h4>
-                  <button className="text-slate-500 font-bold text-xs flex items-center gap-1 bg-white border border-slate-200 px-3 py-1.5 rounded-xl shadow-xs">
-                    {mostrarReportesAdmin ? 'Ocultar' : 'Mostrar'} {mostrarReportesAdmin ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                  </button>
-                </div>
-
-                {mostrarReportesAdmin && (
-                  <div className="p-6 space-y-4">
-                    {reportesGlobales.length === 0 ? (
-                      <p className="text-center text-slate-400 text-xs py-6">No hay reportes de clientes registrados.</p>
-                    ) : (
-                      <div className="space-y-4">
-                        {reportesGlobales.map(rep => (
-                          <div key={rep.id} className="border border-slate-200 rounded-2xl p-4 bg-slate-50/50 space-y-3">
-                            <div className="flex justify-between items-start">
-                              <div>
-                                <span className="font-bold text-slate-800 text-xs">Cliente: <strong className="text-purple-600">{rep.email}</strong></span>
-                                <span className="text-slate-400 text-xs ml-3">{rep.fecha}</span>
-                              </div>
-                              <span className={`px-3 py-1 rounded-full text-xs font-bold ${rep.estado === 'Solucionado' ? 'bg-emerald-100 text-emerald-700' : rep.estado === 'Rechazado' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-800'}`}>
-                                {rep.estado}
-                              </span>
-                            </div>
-
-                            {/* Datos de la cuenta reportada */}
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 bg-white p-3 rounded-xl border border-slate-200 font-mono text-xs">
-                              <div>Correo de cuenta: <strong>{rep.cuenta_correo}</strong></div>
-                              <div>Contraseña de cuenta: <strong>{rep.cuenta_pass}</strong></div>
-                            </div>
-
-                            <div className="text-sm font-medium bg-white p-3 rounded-xl border border-slate-200 text-slate-700">
-                              💬 <strong>Problema reportado:</strong> {rep.mensaje}
-                            </div>
-
-                            <div className="space-y-2 pt-2">
-                              <label className="text-xs font-bold text-slate-500">Respuesta para el cliente:</label>
-                              <div className="flex flex-wrap gap-2">
-                                <input 
-                                  type="text" 
-                                  placeholder="Escribe la solución..." 
-                                  defaultValue={rep.respuesta}
-                                  onChange={e => setRespuestasAdmin({ ...respuestasAdmin, [rep.id]: e.target.value })}
-                                  className="flex-1 min-w-[200px] bg-white border border-slate-200 rounded-xl px-4 py-2 text-xs focus:outline-none focus:border-amber-500 font-medium"
-                                />
-                                <button onClick={() => responderReporteAdmin(rep.id, 'En proceso')} className="bg-amber-500 hover:bg-amber-600 text-white px-3 py-2 rounded-xl text-xs font-bold cursor-pointer">En Proceso</button>
-                                <button onClick={() => responderReporteAdmin(rep.id, 'Solucionado')} className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-xl text-xs font-bold cursor-pointer flex items-center gap-1"><CheckCircle2 size={14} /> Solucionado</button>
-                                <button onClick={() => responderReporteAdmin(rep.id, 'Rechazado')} className="bg-rose-600 hover:bg-rose-700 text-white px-3 py-2 rounded-xl text-xs font-bold cursor-pointer">Rechazado</button>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
+                <p className="text-amber-100 text-sm mt-1">Control de catálogo, inventario, clientes y ventas.</p>
               </div>
 
               {/* 1. AUDITORÍA DE VENTAS */}
@@ -1221,6 +1168,69 @@ export default function VisbackDashboard() {
             </div>
           )}
 
+          {/* PESTAÑA EXCLUSIVA DE ADMIN: REPORTES DE CLIENTES */}
+          {activeTab === 'admin_reportes' && usuarioActual?.rol === 'admin' && (
+            <div className="space-y-6">
+              <div className="bg-gradient-to-r from-amber-600 to-orange-700 rounded-3xl p-6 text-white shadow-xl">
+                <h3 className="text-2xl font-bold">Reportes de Cuentas de Clientes 🛠️</h3>
+                <p className="text-amber-100 text-sm mt-1">Revisa, responde y cambia el estatus de los reportes enviados por los usuarios.</p>
+              </div>
+
+              <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-4">
+                {reportesGlobales.length === 0 ? (
+                  <p className="text-center text-slate-400 text-sm py-12">No hay reportes de clientes registrados.</p>
+                ) : (
+                  <div className="space-y-4">
+                    {reportesGlobales.map(rep => (
+                      <div key={rep.id} className="border border-slate-200 rounded-2xl p-5 bg-slate-50/50 space-y-3">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <span className="font-bold text-slate-800 text-xs">Cliente: <strong className="text-purple-600">{rep.email}</strong></span>
+                            <span className="text-slate-400 text-xs ml-3">{rep.fecha}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-purple-100 text-purple-700 font-mono">
+                              {rep.tipo_cuenta}
+                            </span>
+                            <span className={`px-3 py-1 rounded-full text-xs font-bold ${rep.estado === 'Solucionado' ? 'bg-emerald-100 text-emerald-700' : rep.estado === 'Rechazado' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-800'}`}>
+                              {rep.estado}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Datos de la cuenta reportada */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 bg-white p-3 rounded-xl border border-slate-200 font-mono text-xs">
+                          <div>Correo de cuenta: <strong>{rep.cuenta_correo}</strong></div>
+                          <div>Contraseña de cuenta: <strong>{rep.cuenta_pass}</strong></div>
+                        </div>
+
+                        <div className="text-sm font-medium bg-white p-3 rounded-xl border border-slate-200 text-slate-700">
+                          💬 <strong>Problema reportado:</strong> {rep.mensaje}
+                        </div>
+
+                        <div className="space-y-2 pt-2">
+                          <label className="text-xs font-bold text-slate-500">Respuesta para el cliente:</label>
+                          <div className="flex flex-wrap gap-2">
+                            <input 
+                              type="text" 
+                              placeholder="Escribe la solución..." 
+                              defaultValue={rep.respuesta}
+                              onChange={e => setRespuestasAdmin({ ...respuestasAdmin, [rep.id]: e.target.value })}
+                              className="flex-1 min-w-[200px] bg-white border border-slate-200 rounded-xl px-4 py-2 text-xs focus:outline-none focus:border-amber-500 font-medium"
+                            />
+                            <button onClick={() => responderReporteAdmin(rep.id, 'En proceso')} className="bg-amber-500 hover:bg-amber-600 text-white px-3 py-2 rounded-xl text-xs font-bold cursor-pointer">En Proceso</button>
+                            <button onClick={() => responderReporteAdmin(rep.id, 'Solucionado')} className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-xl text-xs font-bold cursor-pointer flex items-center gap-1"><CheckCircle2 size={14} /> Solucionado</button>
+                            <button onClick={() => responderReporteAdmin(rep.id, 'Rechazado')} className="bg-rose-600 hover:bg-rose-700 text-white px-3 py-2 rounded-xl text-xs font-bold cursor-pointer">Rechazado</button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {activeTab === 'inicio' && (
             <div className="space-y-6">
               <div className="bg-gradient-to-r from-purple-700 to-indigo-800 rounded-3xl p-6 text-white shadow-xl">
@@ -1364,14 +1374,14 @@ export default function VisbackDashboard() {
             <div className="space-y-6">
               <div className="bg-gradient-to-r from-purple-700 to-indigo-800 rounded-3xl p-6 text-white shadow-xl">
                 <h3 className="text-2xl font-bold">Reportar Cuenta con Falla 🛠️</h3>
-                <p className="text-purple-200 text-sm mt-1">Ingresa los datos de la cuenta que te está fallando y detalla el problema para revisarla.</p>
+                <p className="text-purple-200 text-sm mt-1">Ingresa los datos de la cuenta, indica si es Completa o Perfil, y detalla el problema.</p>
               </div>
 
-              {/* ENVIAR NUEVO REPORTE CON LOS 3 CAMPOS */}
+              {/* ENVIAR NUEVO REPORTE CON CORREO, CONTRASEÑA, TIPO Y DESCRIPCIÓN */}
               <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-4">
                 <h4 className="font-bold text-lg text-slate-800">Detalles del Reporte</h4>
                 <form onSubmit={enviarReporteCliente} className="space-y-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div className="space-y-1">
                       <label className="text-xs font-bold text-slate-600">Correo de la cuenta:</label>
                       <input 
@@ -1391,6 +1401,17 @@ export default function VisbackDashboard() {
                         onChange={e => setReporteCuentaPass(e.target.value)}
                         className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-mono focus:outline-none focus:border-purple-500"
                       />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-slate-600">Tipo de cuenta:</label>
+                      <select 
+                        value={reporteTipoCuenta} 
+                        onChange={e => setReporteTipoCuenta(e.target.value as 'Completa' | 'Perfil')}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold focus:outline-none focus:border-purple-500"
+                      >
+                        <option value="Completa">Completa</option>
+                        <option value="Perfil">Perfil</option>
+                      </select>
                     </div>
                   </div>
                   <div className="space-y-1">
@@ -1420,9 +1441,14 @@ export default function VisbackDashboard() {
                       <div key={idx} className="border border-slate-200 rounded-2xl p-5 bg-slate-50/50 space-y-3">
                         <div className="flex justify-between items-center">
                           <span className="font-mono text-xs text-slate-400">{rep.id} - {rep.fecha}</span>
-                          <span className={`px-3 py-1 rounded-full text-xs font-bold ${rep.estado === 'Solucionado' ? 'bg-emerald-100 text-emerald-700' : rep.estado === 'Rechazado' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-800'}`}>
-                            {rep.estado}
-                          </span>
+                          <div className="flex items-center gap-2">
+                            <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-purple-100 text-purple-700 font-mono">
+                              {rep.tipo_cuenta}
+                            </span>
+                            <span className={`px-3 py-1 rounded-full text-xs font-bold ${rep.estado === 'Solucionado' ? 'bg-emerald-100 text-emerald-700' : rep.estado === 'Rechazado' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-800'}`}>
+                              {rep.estado}
+                            </span>
+                          </div>
                         </div>
                         <div className="bg-white p-3 rounded-xl border font-mono text-xs text-slate-700 space-y-1">
                           <div>Cuenta reportada: <strong>{rep.cuenta_correo}</strong> / <strong>{rep.cuenta_pass}</strong></div>
