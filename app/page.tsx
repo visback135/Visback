@@ -22,7 +22,9 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  ArrowUpRight,
+  ArrowDownLeft
 } from 'lucide-react';
 
 interface Producto {
@@ -51,6 +53,14 @@ interface Compra {
   precio: number;
   vencimiento: string;
   estado: string;
+}
+
+interface TransaccionBilletera {
+  id: string;
+  email: string;
+  tipo: 'recarga' | 'ajuste';
+  monto: number;
+  fecha: string;
 }
 
 interface Usuario {
@@ -90,6 +100,7 @@ export default function VisbackDashboard() {
   ]);
   const [inventarioCredenciales, setInventarioCredenciales] = useState<CredencialInventario[]>([]);
   const [comprasGlobales, setComprasGlobales] = useState<Compra[]>([]);
+  const [transaccionesGlobales, setTransaccionesGlobales] = useState<TransaccionBilletera[]>([]);
 
   // Estados para Acordeones (Plegables) en Admin
   const [mostrarAuditoria, setMostrarAuditoria] = useState(true);
@@ -172,6 +183,17 @@ export default function VisbackDashboard() {
           setComprasGlobales(formC);
         }
 
+        if (data.transacciones && Array.isArray(data.transacciones)) {
+          const formT: TransaccionBilletera[] = data.transacciones.map((t: any) => ({
+            id: String(t.id || ''),
+            email: String(t.email || '').trim().toLowerCase(),
+            tipo: String(t.tipo || 'recarga') as 'recarga' | 'ajuste',
+            monto: Number(t.monto) || 0,
+            fecha: String(t.fecha || '')
+          }));
+          setTransaccionesGlobales(formT);
+        }
+
         if (data.usuarios && Array.isArray(data.usuarios)) {
           const formU: Usuario[] = data.usuarios.map((u: any) => ({
             email: String(u.email || '').trim().toLowerCase(),
@@ -220,7 +242,7 @@ export default function VisbackDashboard() {
   }, []);
 
   useEffect(() => {
-    if (activeTab === 'inicio' || activeTab === 'admin' || activeTab === 'compras') {
+    if (activeTab === 'inicio' || activeTab === 'admin' || activeTab === 'compras' || activeTab === 'billetera') {
       sincronizarConGoogleSheets();
     }
   }, [activeTab]);
@@ -348,6 +370,18 @@ export default function VisbackDashboard() {
     });
 
     setUsuariosRegistrados(usuariosActualizados);
+
+    const fechaHoy = new Date().toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    const nuevaTransaccion: TransaccionBilletera = {
+      id: `#T${Math.floor(100000 + Math.random() * 900000)}`,
+      email: emailBuscado,
+      tipo: tipo === 'agregar' ? 'recarga' : 'ajuste',
+      monto: tipo === 'agregar' ? monto : -monto,
+      fecha: fechaHoy
+    };
+
+    setTransaccionesGlobales(prev => [nuevaTransaccion, ...prev]);
+
     try {
       await fetch(GOOGLE_SHEET_URL, {
         method: 'POST',
@@ -355,10 +389,17 @@ export default function VisbackDashboard() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'update_saldo', email: emailBuscado, saldo: saldoFinalCalculado })
       });
+
+      await fetch(GOOGLE_SHEET_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'add_transaccion', ...nuevaTransaccion })
+      });
     } catch (err) { console.error(err); }
 
     setCantidadesRecarga(prev => ({ ...prev, [email]: '' }));
-    alert(`¡Saldo actualizado a $${saldoFinalCalculado.toFixed(2)} MXN!`);
+    alert(`¡Saldo actualizado a $${saldoFinalCalculado.toFixed(2)} MXN y registrado en billetera!`);
     setTimeout(sincronizarConGoogleSheets, 800);
   };
 
@@ -550,7 +591,17 @@ export default function VisbackDashboard() {
       estado: 'Activa'
     };
 
+    const fechaHoy = new Date().toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    const transaccionCompra: TransaccionBilletera = {
+      id: `#T${Math.floor(100000 + Math.random() * 900000)}`,
+      email: usuarioActual.email.toLowerCase(),
+      tipo: 'ajuste',
+      monto: -productoAConfirmar.precio,
+      fecha: fechaHoy
+    };
+
     setComprasGlobales(prev => [nuevaCompra, ...prev]);
+    setTransaccionesGlobales(prev => [transaccionCompra, ...prev]);
 
     try {
       await fetch(GOOGLE_SHEET_URL, {
@@ -572,6 +623,13 @@ export default function VisbackDashboard() {
         mode: 'no-cors',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'add_compra', ...nuevaCompra })
+      });
+
+      await fetch(GOOGLE_SHEET_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'add_transaccion', ...transaccionCompra })
       });
     } catch (err) { 
       console.error("Error en compra:", err); 
@@ -625,6 +683,7 @@ export default function VisbackDashboard() {
   }
 
   const misComprasFiltradas = comprasGlobales.filter(c => c.email === usuarioActual?.email.toLowerCase());
+  const misTransaccionesFiltradas = transaccionesGlobales.filter(t => t.email === usuarioActual?.email.toLowerCase());
 
   // Filtrado y Paginación de Auditoría de Ventas
   const ventasFiltradasBusqueda = comprasGlobales.filter(v => {
@@ -880,7 +939,7 @@ export default function VisbackDashboard() {
                 )}
               </div>
 
-              {/* 7. INVENTARIO ACTUAL (CON BUSCADOR, PAGINACIÓN 15 POR PÁGINA Y PLEGABLE) */}
+              {/* 7. INVENTARIO ACTUAL */}
               <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
                 <div onClick={() => setMostrarInventario(!mostrarInventario)} className="p-6 bg-slate-50 border-b border-slate-200 flex justify-between items-center cursor-pointer select-none">
                   <h4 className="font-bold text-lg text-slate-800">Inventario Actual ({inventarioCredenciales.length})</h4>
@@ -1072,14 +1131,57 @@ export default function VisbackDashboard() {
           )}
 
           {activeTab === 'billetera' && (
-            <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-              <div>
-                <span className="text-xs font-bold uppercase text-slate-400 tracking-wider">Saldo disponible</span>
-                <h3 className="text-3xl font-black text-slate-900 mt-1">${usuarioActual?.saldo.toFixed(2)} MXN</h3>
+            <div className="space-y-6">
+              {/* SALDO ACTUAL Y WHATSAPP */}
+              <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div>
+                  <span className="text-xs font-bold uppercase text-slate-400 tracking-wider">Saldo disponible</span>
+                  <h3 className="text-3xl font-black text-slate-900 mt-1">${usuarioActual?.saldo.toFixed(2)} MXN</h3>
+                </div>
+                <a href={`https://wa.me/${whatsappNumber}?text=Hola%20Visback%20Stream,%20quiero%20recargar%20saldo.`} target="_blank" rel="noopener noreferrer" className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-6 py-3 rounded-2xl transition-all shadow-lg shadow-emerald-600/20 flex items-center gap-2 text-sm cursor-pointer">
+                  <MessageCircle size={18} /> Solicitar Recarga por WhatsApp
+                </a>
               </div>
-              <a href={`https://wa.me/${whatsappNumber}?text=Hola%20Visback%20Stream,%20quiero%20recargar%20saldo.`} target="_blank" rel="noopener noreferrer" className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-6 py-3 rounded-2xl transition-all shadow-lg shadow-emerald-600/20 flex items-center gap-2 text-sm cursor-pointer">
-                <MessageCircle size={18} /> Solicitar Recarga por WhatsApp
-              </a>
+
+              {/* HISTORIAL DE MOVIMIENTOS DE BILLETERA */}
+              <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-4">
+                <h3 className="font-bold text-lg text-slate-800">Historial de Recargas y Movimientos</h3>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm">
+                    <thead>
+                      <tr className="bg-slate-50 text-slate-500 font-bold uppercase border-b text-xs">
+                        <th className="p-3">ID Movimiento</th>
+                        <th className="p-3">Fecha</th>
+                        <th className="p-3">Tipo</th>
+                        <th className="p-3 text-right">Monto</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {misTransaccionesFiltradas.length === 0 ? (
+                        <tr>
+                          <td colSpan={4} className="p-6 text-center text-slate-400 text-sm">Aún no hay movimientos registrados en tu billetera.</td>
+                        </tr>
+                      ) : (
+                        misTransaccionesFiltradas.map((t, idx) => (
+                          <tr key={idx}>
+                            <td className="p-3 font-mono font-bold text-xs text-slate-600">{t.id}</td>
+                            <td className="p-3 text-xs text-slate-500">{t.fecha}</td>
+                            <td className="p-3">
+                              <span className={`px-2.5 py-1 rounded-full text-xs font-bold inline-flex items-center gap-1 ${t.monto > 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
+                                {t.monto > 0 ? <ArrowUpRight size={14} /> : <ArrowDownLeft size={14} />}
+                                {t.monto > 0 ? 'Recarga de Saldo' : 'Compra de Servicio'}
+                              </span>
+                            </td>
+                            <td className={`p-3 text-right font-black text-base ${t.monto > 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                              {t.monto > 0 ? `+${t.monto.toFixed(2)}` : t.monto.toFixed(2)} MXN
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             </div>
           )}
         </main>
