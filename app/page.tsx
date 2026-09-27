@@ -20,7 +20,9 @@ import {
   ShieldAlert,
   Search,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 
 interface Producto {
@@ -89,10 +91,24 @@ export default function VisbackDashboard() {
   const [inventarioCredenciales, setInventarioCredenciales] = useState<CredencialInventario[]>([]);
   const [comprasGlobales, setComprasGlobales] = useState<Compra[]>([]);
 
-  // Estados para Buscador y Paginación en Auditoría de Ventas
+  // Estados para Acordeones (Plegables) en Admin
+  const [mostrarAuditoria, setMostrarAuditoria] = useState(true);
+  const [mostrarCrearCliente, setMostrarCrearCliente] = useState(false);
+  const [mostrarCrearProd, setMostrarCrearProd] = useState(false);
+  const [mostrarListaProd, setMostrarListaProd] = useState(true);
+  const [mostrarAgregarCred, setMostrarAgregarCred] = useState(true);
+  const [mostrarCargaMasiva, setMostrarCargaMasiva] = useState(false);
+  const [mostrarInventario, setMostrarInventario] = useState(true);
+  const [mostrarClientes, setMostrarClientes] = useState(true);
+
+  // Buscadores y Paginación (15 por página)
   const [busquedaVentas, setBusquedaVentas] = useState('');
-  const [paginaActualVentas, setPaginaActualVentas] = useState(1);
-  const ventasPorPagina = 5; // Cantidad de filas a mostrar por página
+  const [paginaVentas, setPaginaVentas] = useState(1);
+
+  const [busquedaInventario, setBusquedaInventario] = useState('');
+  const [paginaInventario, setPaginaInventario] = useState(1);
+
+  const itemsPorPagina = 15;
 
   const [productoAConfirmar, setProductoAConfirmar] = useState<Producto | null>(null);
   const [compraExitosa, setCompraExitosa] = useState<Compra | null>(null);
@@ -610,23 +626,21 @@ export default function VisbackDashboard() {
 
   const misComprasFiltradas = comprasGlobales.filter(c => c.email === usuarioActual?.email.toLowerCase());
 
-  // Filtrar Auditoría de Ventas Globales con la Lupa
+  // Filtrado y Paginación de Auditoría de Ventas
   const ventasFiltradasBusqueda = comprasGlobales.filter(v => {
-    const query = busquedaVentas.toLowerCase();
-    return (
-      v.email.toLowerCase().includes(query) ||
-      v.producto.toLowerCase().includes(query) ||
-      v.correo.toLowerCase().includes(query) ||
-      v.pass.toLowerCase().includes(query) ||
-      v.vencimiento.toLowerCase().includes(query)
-    );
+    const q = busquedaVentas.toLowerCase();
+    return v.email.toLowerCase().includes(q) || v.producto.toLowerCase().includes(q) || v.correo.toLowerCase().includes(q) || v.pass.toLowerCase().includes(q) || v.vencimiento.toLowerCase().includes(q);
   });
+  const totalPaginasVentas = Math.ceil(ventasFiltradasBusqueda.length / itemsPorPagina) || 1;
+  const ventasPaginadas = ventasFiltradasBusqueda.slice((paginaVentas - 1) * itemsPorPagina, paginaVentas * itemsPorPagina);
 
-  // Lógica de Paginación para Auditoría de Ventas
-  const totalPaginasVentas = Math.ceil(ventasFiltradasBusqueda.length / ventasPorPagina) || 1;
-  const indiceUltimoRegistro = paginaActualVentas * ventasPorPagina;
-  const indicePrimerRegistro = indiceUltimoRegistro - ventasPorPagina;
-  const ventasPaginadas = ventasFiltradasBusqueda.slice(indicePrimerRegistro, indiceUltimoRegistro);
+  // Filtrado y Paginación de Inventario Actual
+  const inventarioFiltradoBusqueda = inventarioCredenciales.filter(i => {
+    const q = busquedaInventario.toLowerCase();
+    return i.productoId.toLowerCase().includes(q) || i.correo.toLowerCase().includes(q) || i.pass.toLowerCase().includes(q) || i.estado.toLowerCase().includes(q);
+  });
+  const totalPaginasInventario = Math.ceil(inventarioFiltradoBusqueda.length / itemsPorPagina) || 1;
+  const inventarioPaginado = inventarioFiltradoBusqueda.slice((paginaInventario - 1) * itemsPorPagina, paginaInventario * itemsPorPagina);
 
   return (
     <div className="flex h-screen bg-slate-50 font-sans text-slate-800">
@@ -685,252 +699,290 @@ export default function VisbackDashboard() {
                 <p className="text-amber-100 text-sm mt-1">Control de catálogo, inventario, clientes y auditoría de ventas.</p>
               </div>
 
-              {/* AUDITORÍA GLOBAL DE VENTAS CON BUSCADOR Y PAGINACIÓN TIPO PORNHUB */}
-              <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              {/* 1. AUDITORÍA DE VENTAS */}
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                <div onClick={() => setMostrarAuditoria(!mostrarAuditoria)} className="p-6 bg-slate-50 border-b border-slate-200 flex justify-between items-center cursor-pointer select-none">
                   <h4 className="font-bold text-lg text-slate-800 flex items-center gap-2">
                     <ShieldAlert size={20} className="text-amber-600" /> Auditoría de Ventas Globales ({comprasGlobales.length})
                   </h4>
-                  
-                  {/* BARRA DE BÚSQUEDA (LUPA) */}
-                  <div className="relative w-full sm:w-72">
-                    <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-slate-400">
-                      <Search size={16} />
-                    </span>
-                    <input 
-                      type="text" 
-                      placeholder="Buscar cliente, servicio, cuenta..." 
-                      value={busquedaVentas}
-                      onChange={e => { setBusquedaVentas(e.target.value); setPaginaActualVentas(1); }}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-4 py-2 text-xs focus:outline-none focus:border-amber-500 font-medium"
-                    />
-                  </div>
+                  <button className="text-slate-500 font-bold text-xs flex items-center gap-1 bg-white border border-slate-200 px-3 py-1.5 rounded-xl shadow-xs">
+                    {mostrarAuditoria ? 'Ocultar' : 'Mostrar'} {mostrarAuditoria ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                  </button>
                 </div>
 
-                <div className="overflow-x-auto min-h-[220px]">
-                  <table className="w-full text-left text-sm">
-                    <thead>
-                      <tr className="bg-slate-50 text-slate-500 font-bold uppercase border-b text-xs">
-                        <th className="p-3">Cliente (Comprador)</th>
-                        <th className="p-3">Servicio</th>
-                        <th className="p-3">Cuenta Entregada</th>
-                        <th className="p-3">Vence</th>
-                        <th className="p-3">Precio</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y">
-                      {ventasPaginadas.length === 0 ? (
-                        <tr>
-                          <td colSpan={5} className="p-8 text-center text-slate-400 text-xs">No se encontraron registros coincidentes.</td>
-                        </tr>
-                      ) : (
-                        ventasPaginadas.map((venta, idx) => (
-                          <tr key={idx}>
-                            <td className="p-3 font-mono font-bold text-purple-600 text-xs">{venta.email}</td>
-                            <td className="p-3 font-semibold">{venta.producto}</td>
-                            <td className="p-3 font-mono text-xs">{venta.correo} / {venta.pass} {venta.pin !== 'N/A' && `(PIN: ${venta.pin})`}</td>
-                            <td className="p-3 font-mono text-xs text-slate-500">{venta.vencimiento}</td>
-                            <td className="p-3 font-bold text-emerald-600">${venta.precio.toFixed(2)}</td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-
-                {/* BARRA DE PAGINACIÓN TIPO NAVEGACIÓN */}
-                {totalPaginasVentas > 1 && (
-                  <div className="flex items-center justify-between pt-4 border-t border-slate-100">
-                    <span className="text-xs text-slate-500 font-medium">
-                      Página <strong>{paginaActualVentas}</strong> de <strong>{totalPaginasVentas}</strong>
-                    </span>
-                    <div className="flex items-center gap-1.5">
-                      <button 
-                        onClick={() => setPaginaActualVentas(prev => Math.max(prev - 1, 1))}
-                        disabled={paginaActualVentas === 1}
-                        className={`p-2 rounded-xl border text-xs font-bold flex items-center gap-1 transition-all ${paginaActualVentas === 1 ? 'bg-slate-100 text-slate-300 border-slate-200 cursor-not-allowed' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50 cursor-pointer'}`}
-                      >
-                        <ChevronLeft size={16} /> Anteriores
-                      </button>
-
-                      {/* NÚMEROS DE PÁGINA */}
-                      <div className="hidden sm:flex gap-1">
-                        {Array.from({ length: totalPaginasVentas }, (_, i) => i + 1).map(num => (
-                          <button
-                            key={num}
-                            onClick={() => setPaginaActualVentas(num)}
-                            className={`w-8 h-8 rounded-xl font-bold text-xs flex items-center justify-center cursor-pointer transition-all ${paginaActualVentas === num ? 'bg-amber-600 text-white shadow-md' : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'}`}
-                          >
-                            {num}
-                          </button>
-                        ))}
+                {mostrarAuditoria && (
+                  <div className="p-6 space-y-4">
+                    <div className="flex justify-end">
+                      <div className="relative w-full sm:w-72">
+                        <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-slate-400"><Search size={16} /></span>
+                        <input type="text" placeholder="Buscar venta..." value={busquedaVentas} onChange={e => { setBusquedaVentas(e.target.value); setPaginaVentas(1); }} className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-4 py-2 text-xs focus:outline-none focus:border-amber-500 font-medium" />
                       </div>
-
-                      <button 
-                        onClick={() => setPaginaActualVentas(prev => Math.min(prev + 1, totalPaginasVentas))}
-                        disabled={paginaActualVentas === totalPaginasVentas}
-                        className={`p-2 rounded-xl border text-xs font-bold flex items-center gap-1 transition-all ${paginaActualVentas === totalPaginasVentas ? 'bg-slate-100 text-slate-300 border-slate-200 cursor-not-allowed' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50 cursor-pointer'}`}
-                      >
-                        Siguientes <ChevronRight size={16} />
-                      </button>
                     </div>
+                    <div className="overflow-x-auto min-h-[180px]">
+                      <table className="w-full text-left text-sm">
+                        <thead>
+                          <tr className="bg-slate-50 text-slate-500 font-bold uppercase border-b text-xs">
+                            <th className="p-3">Cliente (Comprador)</th>
+                            <th className="p-3">Servicio</th>
+                            <th className="p-3">Cuenta Entregada</th>
+                            <th className="p-3">Vence</th>
+                            <th className="p-3">Precio</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y">
+                          {ventasPaginadas.length === 0 ? (
+                            <tr><td colSpan={5} className="p-6 text-center text-slate-400 text-xs">No hay registros coincidentes.</td></tr>
+                          ) : (
+                            ventasPaginadas.map((v, i) => (
+                              <tr key={i}>
+                                <td className="p-3 font-mono font-bold text-purple-600 text-xs">{v.email}</td>
+                                <td className="p-3 font-semibold">{v.producto}</td>
+                                <td className="p-3 font-mono text-xs">{v.correo} / {v.pass} {v.pin !== 'N/A' && `(PIN: ${v.pin})`}</td>
+                                <td className="p-3 font-mono text-xs text-slate-500">{v.vencimiento}</td>
+                                <td className="p-3 font-bold text-emerald-600">${v.precio.toFixed(2)}</td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                    {totalPaginasVentas > 1 && (
+                      <div className="flex items-center justify-between pt-3 border-t">
+                        <span className="text-xs text-slate-500">Pág. <strong>{paginaVentas}</strong> de <strong>{totalPaginasVentas}</strong> (15 por pág.)</span>
+                        <div className="flex gap-1">
+                          <button onClick={() => setPaginaVentas(p => Math.max(p - 1, 1))} disabled={paginaVentas === 1} className="p-2 border rounded-xl text-xs font-bold bg-white disabled:opacity-40 cursor-pointer flex items-center gap-1"><ChevronLeft size={14} /> Ant</button>
+                          <button onClick={() => setPaginaVentas(p => Math.min(p + 1, totalPaginasVentas))} disabled={paginaVentas === totalPaginasVentas} className="p-2 border rounded-xl text-xs font-bold bg-white disabled:opacity-40 cursor-pointer flex items-center gap-1">Sig <ChevronRight size={14} /></button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
 
-              {/* REGISTRAR CLIENTE */}
-              <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-                <h4 className="font-bold text-lg text-slate-800 flex items-center gap-2">
-                  <UserPlus size={20} className="text-purple-600" /> Registrar Nuevo Cliente Directamente
-                </h4>
-                <form onSubmit={agregarClienteAdmin} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                  <input type="text" placeholder="Nombre completo" value={adminNuevoNombre} onChange={e => setAdminNuevoNombre(e.target.value)} className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm" />
-                  <input type="email" placeholder="Correo electrónico" value={adminNuevoEmail} onChange={e => setAdminNuevoEmail(e.target.value)} className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm" />
-                  <input type="password" placeholder="Contraseña" value={adminNuevoPass} onChange={e => setAdminNuevoPass(e.target.value)} className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm" />
-                  <button type="submit" className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2.5 rounded-xl text-sm cursor-pointer shadow-md">Crear Cuenta</button>
-                </form>
+              {/* 2. REGISTRAR NUEVO CLIENTE */}
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                <div onClick={() => setMostrarCrearCliente(!mostrarCrearCliente)} className="p-6 bg-slate-50 border-b border-slate-200 flex justify-between items-center cursor-pointer select-none">
+                  <h4 className="font-bold text-lg text-slate-800 flex items-center gap-2">
+                    <UserPlus size={20} className="text-purple-600" /> Registrar Nuevo Cliente Directamente
+                  </h4>
+                  <button className="text-slate-500 font-bold text-xs flex items-center gap-1 bg-white border border-slate-200 px-3 py-1.5 rounded-xl shadow-xs">
+                    {mostrarCrearCliente ? 'Ocultar' : 'Mostrar'} {mostrarCrearCliente ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                  </button>
+                </div>
+                {mostrarCrearCliente && (
+                  <form onSubmit={agregarClienteAdmin} className="p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <input type="text" placeholder="Nombre completo" value={adminNuevoNombre} onChange={e => setAdminNuevoNombre(e.target.value)} className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm" />
+                    <input type="email" placeholder="Correo electrónico" value={adminNuevoEmail} onChange={e => setAdminNuevoEmail(e.target.value)} className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm" />
+                    <input type="password" placeholder="Contraseña" value={adminNuevoPass} onChange={e => setAdminNuevoPass(e.target.value)} className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm" />
+                    <button type="submit" className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2.5 rounded-xl text-sm cursor-pointer shadow-md">Crear Cuenta</button>
+                  </form>
+                )}
               </div>
 
-              {/* AGREGAR PRODUCTO */}
-              <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-                <h4 className="font-bold text-lg text-slate-800 flex items-center gap-2">
-                  <PlusCircle size={20} className="text-purple-600" /> Agregar Producto al Catálogo
-                </h4>
-                <form onSubmit={agregarProductoAdmin} className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <input type="text" placeholder="ID único (ej. disney)" value={nuevoProdId} onChange={e => setNuevoProdId(e.target.value)} className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-mono" />
-                  <input type="text" placeholder="Nombre (ej. Disney+)" value={nuevoProdNombre} onChange={e => setNuevoProdNombre(e.target.value)} className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm" />
-                  <input type="number" placeholder="Precio ($ MXN)" value={nuevoProdPrecio} onChange={e => setNuevoProdPrecio(e.target.value)} className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm" />
-                  <input type="text" placeholder="Descripción" value={nuevoProdDesc} onChange={e => setNuevoProdDesc(e.target.value)} className="sm:col-span-3 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm" />
-                  <button type="submit" className="sm:col-span-3 bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 rounded-xl text-sm cursor-pointer shadow-md">Publicar Producto</button>
-                </form>
+              {/* 3. AGREGAR PRODUCTO */}
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                <div onClick={() => setMostrarCrearProd(!mostrarCrearProd)} className="p-6 bg-slate-50 border-b border-slate-200 flex justify-between items-center cursor-pointer select-none">
+                  <h4 className="font-bold text-lg text-slate-800 flex items-center gap-2">
+                    <PlusCircle size={20} className="text-purple-600" /> Agregar Producto al Catálogo
+                  </h4>
+                  <button className="text-slate-500 font-bold text-xs flex items-center gap-1 bg-white border border-slate-200 px-3 py-1.5 rounded-xl shadow-xs">
+                    {mostrarCrearProd ? 'Ocultar' : 'Mostrar'} {mostrarCrearProd ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                  </button>
+                </div>
+                {mostrarCrearProd && (
+                  <form onSubmit={agregarProductoAdmin} className="p-6 grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <input type="text" placeholder="ID único (ej. disney)" value={nuevoProdId} onChange={e => setNuevoProdId(e.target.value)} className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-mono" />
+                    <input type="text" placeholder="Nombre (ej. Disney+)" value={nuevoProdNombre} onChange={e => setNuevoProdNombre(e.target.value)} className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm" />
+                    <input type="number" placeholder="Precio ($ MXN)" value={nuevoProdPrecio} onChange={e => setNuevoProdPrecio(e.target.value)} className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm" />
+                    <input type="text" placeholder="Descripción" value={nuevoProdDesc} onChange={e => setNuevoProdDesc(e.target.value)} className="sm:col-span-3 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm" />
+                    <button type="submit" className="sm:col-span-3 bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 rounded-xl text-sm cursor-pointer shadow-md">Publicar Producto</button>
+                  </form>
+                )}
               </div>
 
-              {/* PRODUCTOS EN LA TIENDA */}
-              <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-                <h4 className="font-bold text-lg text-slate-800">Productos en la Tienda ({productos.length})</h4>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-sm">
-                    <thead>
-                      <tr className="bg-slate-50 text-slate-500 font-bold uppercase border-b text-xs">
-                        <th className="p-3">ID</th>
-                        <th className="p-3">Nombre</th>
-                        <th className="p-3">Precio</th>
-                        <th className="p-3 text-center">Acción</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y">
+              {/* 4. PRODUCTOS EN LA TIENDA */}
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                <div onClick={() => setMostrarListaProd(!mostrarListaProd)} className="p-6 bg-slate-50 border-b border-slate-200 flex justify-between items-center cursor-pointer select-none">
+                  <h4 className="font-bold text-lg text-slate-800">Productos en la Tienda ({productos.length})</h4>
+                  <button className="text-slate-500 font-bold text-xs flex items-center gap-1 bg-white border border-slate-200 px-3 py-1.5 rounded-xl shadow-xs">
+                    {mostrarListaProd ? 'Ocultar' : 'Mostrar'} {mostrarListaProd ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                  </button>
+                </div>
+                {mostrarListaProd && (
+                  <div className="p-6 overflow-x-auto">
+                    <table className="w-full text-left text-sm">
+                      <thead>
+                        <tr className="bg-slate-50 text-slate-500 font-bold uppercase border-b text-xs">
+                          <th className="p-3">ID</th>
+                          <th className="p-3">Nombre</th>
+                          <th className="p-3">Precio</th>
+                          <th className="p-3 text-center">Acción</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y">
+                        {productos.map(p => (
+                          <tr key={p.id}>
+                            <td className="p-3 font-mono font-bold text-purple-600">{p.id}</td>
+                            <td className="p-3 font-semibold">{p.nombre}</td>
+                            <td className="p-3 font-bold">${p.precio.toFixed(2)} MXN</td>
+                            <td className="p-3 text-center">
+                              <button onClick={() => eliminarProducto(p.id)} className="bg-red-100 text-red-600 hover:bg-red-200 px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer">Eliminar</button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+
+              {/* 5. AGREGAR CUENTA AL INVENTARIO */}
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                <div onClick={() => setMostrarAgregarCred(!mostrarAgregarCred)} className="p-6 bg-slate-50 border-b border-slate-200 flex justify-between items-center cursor-pointer select-none">
+                  <h4 className="font-bold text-lg text-slate-800">Agregar Cuenta al Inventario</h4>
+                  <button className="text-slate-500 font-bold text-xs flex items-center gap-1 bg-white border border-slate-200 px-3 py-1.5 rounded-xl shadow-xs">
+                    {mostrarAgregarCred ? 'Ocultar' : 'Mostrar'} {mostrarAgregarCred ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                  </button>
+                </div>
+                {mostrarAgregarCred && (
+                  <form onSubmit={agregarCredencialInventario} className="p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <select value={credProdId} onChange={e => setCredProdId(e.target.value)} className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold">
                       {productos.map(p => (
-                        <tr key={p.id}>
-                          <td className="p-3 font-mono font-bold text-purple-600">{p.id}</td>
-                          <td className="p-3 font-semibold">{p.nombre}</td>
-                          <td className="p-3 font-bold">${p.precio.toFixed(2)} MXN</td>
-                          <td className="p-3 text-center">
-                            <button onClick={() => eliminarProducto(p.id)} className="bg-red-100 text-red-600 hover:bg-red-200 px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer">Eliminar</button>
-                          </td>
-                        </tr>
+                        <option key={p.id} value={p.id}>{p.nombre} (Stock: {obtenerStock(p.id)})</option>
                       ))}
-                    </tbody>
-                  </table>
+                    </select>
+                    <input type="text" placeholder="Correo" value={credCorreo} onChange={e => setCredCorreo(e.target.value)} className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm" />
+                    <input type="text" placeholder="Contraseña" value={credPass} onChange={e => setCredPass(e.target.value)} className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm" />
+                    <input type="text" placeholder="PIN" value={credPin} onChange={e => setCredPin(e.target.value)} className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm" />
+                    <button type="submit" className="sm:col-span-2 lg:col-span-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl text-sm cursor-pointer shadow-md">Guardar Cuenta y Aumentar Stock</button>
+                  </form>
+                )}
+              </div>
+
+              {/* 6. CARGA MASIVA */}
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                <div onClick={() => setMostrarCargaMasiva(!mostrarCargaMasiva)} className="p-6 bg-slate-50 border-b border-slate-200 flex justify-between items-center cursor-pointer select-none">
+                  <h4 className="font-bold text-lg text-slate-800">Carga Masiva de Cuentas</h4>
+                  <button className="text-slate-500 font-bold text-xs flex items-center gap-1 bg-white border border-slate-200 px-3 py-1.5 rounded-xl shadow-xs">
+                    {mostrarCargaMasiva ? 'Ocultar' : 'Mostrar'} {mostrarCargaMasiva ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                  </button>
                 </div>
-              </div>
-
-              {/* AGREGAR CREDENCIAL */}
-              <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-                <h4 className="font-bold text-lg text-slate-800">Agregar Cuenta al Inventario</h4>
-                <form onSubmit={agregarCredencialInventario} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                  <select value={credProdId} onChange={e => setCredProdId(e.target.value)} className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold">
-                    {productos.map(p => (
-                      <option key={p.id} value={p.id}>{p.nombre} (Stock: {obtenerStock(p.id)})</option>
-                    ))}
-                  </select>
-                  <input type="text" placeholder="Correo" value={credCorreo} onChange={e => setCredCorreo(e.target.value)} className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm" />
-                  <input type="text" placeholder="Contraseña" value={credPass} onChange={e => setCredPass(e.target.value)} className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm" />
-                  <input type="text" placeholder="PIN" value={credPin} onChange={e => setCredPin(e.target.value)} className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm" />
-                  <button type="submit" className="sm:col-span-2 lg:col-span-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl text-sm cursor-pointer shadow-md">Guardar Cuenta y Aumentar Stock</button>
-                </form>
-              </div>
-
-              {/* CARGA MASIVA */}
-              <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-                <h4 className="font-bold text-lg text-slate-800">Carga Masiva de Cuentas</h4>
-                <form onSubmit={agregarCredencialMasiva} className="space-y-4">
-                  <select value={credProdId} onChange={e => setCredProdId(e.target.value)} className="w-full max-w-xs bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold">
-                    {productos.map(p => (
-                      <option key={p.id} value={p.id}>{p.nombre} (Stock: {obtenerStock(p.id)})</option>
-                    ))}
-                  </select>
-                  <textarea rows={4} placeholder="correo1@gmail.com pass123 1234&#10;correo2@gmail.com pass456 5678" value={textoMasivo} onChange={e => setTextoMasivo(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl p-4 text-xs font-mono" />
-                  <button type="submit" className="bg-purple-600 hover:bg-purple-700 text-white font-bold px-6 py-3 rounded-xl text-sm cursor-pointer shadow-md">Cargar Masivamente</button>
-                </form>
-              </div>
-
-              {/* INVENTARIO */}
-              <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-                <h4 className="font-bold text-lg text-slate-800">Inventario Actual ({inventarioCredenciales.length})</h4>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-sm">
-                    <thead>
-                      <tr className="bg-slate-50 text-slate-500 font-bold uppercase border-b text-xs">
-                        <th className="p-3">ID Producto</th>
-                        <th className="p-3">Credencial</th>
-                        <th className="p-3">Estado</th>
-                        <th className="p-3 text-center">Acción</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y">
-                      {inventarioCredenciales.map(c => (
-                        <tr key={c.id}>
-                          <td className="p-3 font-mono font-bold text-purple-600">{c.productoId}</td>
-                          <td className="p-3 font-mono text-xs">{c.correo} / {c.pass}</td>
-                          <td className="p-3"><span className={`px-2 py-0.5 rounded-full text-xs font-bold ${c.estado === 'disponible' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>{c.estado}</span></td>
-                          <td className="p-3 text-center">
-                            <button onClick={() => eliminarCredencial(c.id)} className="bg-red-100 text-red-600 hover:bg-red-200 p-1.5 rounded-lg cursor-pointer"><Trash2 size={14} /></button>
-                          </td>
-                        </tr>
+                {mostrarCargaMasiva && (
+                  <form onSubmit={agregarCredencialMasiva} className="p-6 space-y-4">
+                    <select value={credProdId} onChange={e => setCredProdId(e.target.value)} className="w-full max-w-xs bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold">
+                      {productos.map(p => (
+                        <option key={p.id} value={p.id}>{p.nombre} (Stock: {obtenerStock(p.id)})</option>
                       ))}
-                    </tbody>
-                  </table>
-                </div>
+                    </select>
+                    <textarea rows={4} placeholder="correo1@gmail.com pass123 1234&#10;correo2@gmail.com pass456 5678" value={textoMasivo} onChange={e => setTextoMasivo(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl p-4 text-xs font-mono" />
+                    <button type="submit" className="bg-purple-600 hover:bg-purple-700 text-white font-bold px-6 py-3 rounded-xl text-sm cursor-pointer shadow-md">Cargar Masivamente</button>
+                  </form>
+                )}
               </div>
 
-              {/* GESTIÓN DE CLIENTES */}
-              <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-                <h4 className="font-bold text-lg text-slate-800">Gestión de Clientes ({usuariosRegistrados.length})</h4>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-sm">
-                    <thead>
-                      <tr className="bg-slate-50 text-slate-500 font-bold uppercase border-b text-xs">
-                        <th className="p-3">Nombre / Correo</th>
-                        <th className="p-3">Saldo</th>
-                        <th className="p-3">Ajustar Saldo</th>
-                        <th className="p-3 text-center">Acción</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y">
-                      {usuariosRegistrados.map(u => (
-                        <tr key={u.email}>
-                          <td className="p-3">
-                            <div className="font-bold">{u.nombre}</div>
-                            <div className="text-xs text-slate-400 font-mono">{u.email}</div>
-                          </td>
-                          <td className="p-3 font-bold text-emerald-600">${u.saldo.toFixed(2)}</td>
-                          <td className="p-3">
-                            <div className="flex items-center gap-2">
-                              <input type="number" placeholder="Monto" value={cantidadesRecarga[u.email] || ''} onChange={e => setCantidadesRecarga({ ...cantidadesRecarga, [u.email]: e.target.value })} className="w-24 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-xs" />
-                              <button onClick={() => ajustarSaldoUsuario(u.email, 'agregar')} className="bg-emerald-600 hover:bg-emerald-700 text-white px-2.5 py-1 rounded-lg text-xs font-bold cursor-pointer">+</button>
-                              <button onClick={() => ajustarSaldoUsuario(u.email, 'quitar')} className="bg-red-600 hover:bg-red-700 text-white px-2.5 py-1 rounded-lg text-xs font-bold cursor-pointer">-</button>
-                            </div>
-                          </td>
-                          <td className="p-3 text-center">
-                            {u.email !== 'admin@visback.com' && (
-                              <button onClick={() => eliminarUsuario(u.email)} className="bg-red-100 text-red-600 hover:bg-red-200 px-3 py-1 rounded-lg text-xs font-bold cursor-pointer">Eliminar</button>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+              {/* 7. INVENTARIO ACTUAL (CON BUSCADOR, PAGINACIÓN 15 POR PÁGINA Y PLEGABLE) */}
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                <div onClick={() => setMostrarInventario(!mostrarInventario)} className="p-6 bg-slate-50 border-b border-slate-200 flex justify-between items-center cursor-pointer select-none">
+                  <h4 className="font-bold text-lg text-slate-800">Inventario Actual ({inventarioCredenciales.length})</h4>
+                  <button className="text-slate-500 font-bold text-xs flex items-center gap-1 bg-white border border-slate-200 px-3 py-1.5 rounded-xl shadow-xs">
+                    {mostrarInventario ? 'Ocultar' : 'Mostrar'} {mostrarInventario ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                  </button>
                 </div>
+
+                {mostrarInventario && (
+                  <div className="p-6 space-y-4">
+                    <div className="flex justify-end">
+                      <div className="relative w-full sm:w-72">
+                        <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-slate-400"><Search size={16} /></span>
+                        <input type="text" placeholder="Buscar en inventario..." value={busquedaInventario} onChange={e => { setBusquedaInventario(e.target.value); setPaginaInventario(1); }} className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-4 py-2 text-xs focus:outline-none focus:border-purple-500 font-medium" />
+                      </div>
+                    </div>
+                    <div className="overflow-x-auto min-h-[220px]">
+                      <table className="w-full text-left text-sm">
+                        <thead>
+                          <tr className="bg-slate-50 text-slate-500 font-bold uppercase border-b text-xs">
+                            <th className="p-3">ID Producto</th>
+                            <th className="p-3">Credencial</th>
+                            <th className="p-3">Estado</th>
+                            <th className="p-3 text-center">Acción</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y">
+                          {inventarioPaginado.length === 0 ? (
+                            <tr><td colSpan={4} className="p-6 text-center text-slate-400 text-xs">No hay cuentas en el inventario.</td></tr>
+                          ) : (
+                            inventarioPaginado.map(c => (
+                              <tr key={c.id}>
+                                <td className="p-3 font-mono font-bold text-purple-600">{c.productoId}</td>
+                                <td className="p-3 font-mono text-xs">{c.correo} / {c.pass} {c.pin !== 'N/A' && `(PIN: ${c.pin})`}</td>
+                                <td className="p-3"><span className={`px-2 py-0.5 rounded-full text-xs font-bold ${c.estado === 'disponible' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>{c.estado}</span></td>
+                                <td className="p-3 text-center">
+                                  <button onClick={() => eliminarCredencial(c.id)} className="bg-red-100 text-red-600 hover:bg-red-200 p-1.5 rounded-lg cursor-pointer"><Trash2 size={14} /></button>
+                                </td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                    {totalPaginasInventario > 1 && (
+                      <div className="flex items-center justify-between pt-3 border-t">
+                        <span className="text-xs text-slate-500">Pág. <strong>{paginaInventario}</strong> de <strong>{totalPaginasInventario}</strong> (15 por pág.)</span>
+                        <div className="flex gap-1">
+                          <button onClick={() => setPaginaInventario(p => Math.max(p - 1, 1))} disabled={paginaInventario === 1} className="p-2 border rounded-xl text-xs font-bold bg-white disabled:opacity-40 cursor-pointer flex items-center gap-1"><ChevronLeft size={14} /> Ant</button>
+                          <button onClick={() => setPaginaInventario(p => Math.min(p + 1, totalPaginasInventario))} disabled={paginaInventario === totalPaginasInventario} className="p-2 border rounded-xl text-xs font-bold bg-white disabled:opacity-40 cursor-pointer flex items-center gap-1">Sig <ChevronRight size={14} /></button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* 8. GESTIÓN DE CLIENTES */}
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                <div onClick={() => setMostrarClientes(!mostrarClientes)} className="p-6 bg-slate-50 border-b border-slate-200 flex justify-between items-center cursor-pointer select-none">
+                  <h4 className="font-bold text-lg text-slate-800">Gestión de Clientes ({usuariosRegistrados.length})</h4>
+                  <button className="text-slate-500 font-bold text-xs flex items-center gap-1 bg-white border border-slate-200 px-3 py-1.5 rounded-xl shadow-xs">
+                    {mostrarClientes ? 'Ocultar' : 'Mostrar'} {mostrarClientes ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                  </button>
+                </div>
+                {mostrarClientes && (
+                  <div className="p-6 overflow-x-auto">
+                    <table className="w-full text-left text-sm">
+                      <thead>
+                        <tr className="bg-slate-50 text-slate-500 font-bold uppercase border-b text-xs">
+                          <th className="p-3">Nombre / Correo</th>
+                          <th className="p-3">Saldo</th>
+                          <th className="p-3">Ajustar Saldo</th>
+                          <th className="p-3 text-center">Acción</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y">
+                        {usuariosRegistrados.map(u => (
+                          <tr key={u.email}>
+                            <td className="p-3">
+                              <div className="font-bold">{u.nombre}</div>
+                              <div className="text-xs text-slate-400 font-mono">{u.email}</div>
+                            </td>
+                            <td className="p-3 font-bold text-emerald-600">${u.saldo.toFixed(2)}</td>
+                            <td className="p-3">
+                              <div className="flex items-center gap-2">
+                                <input type="number" placeholder="Monto" value={cantidadesRecarga[u.email] || ''} onChange={e => setCantidadesRecarga({ ...cantidadesRecarga, [u.email]: e.target.value })} className="w-24 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-xs" />
+                                <button onClick={() => ajustarSaldoUsuario(u.email, 'agregar')} className="bg-emerald-600 hover:bg-emerald-700 text-white px-2.5 py-1 rounded-lg text-xs font-bold cursor-pointer">+</button>
+                                <button onClick={() => ajustarSaldoUsuario(u.email, 'quitar')} className="bg-red-600 hover:bg-red-700 text-white px-2.5 py-1 rounded-lg text-xs font-bold cursor-pointer">-</button>
+                              </div>
+                            </td>
+                            <td className="p-3 text-center">
+                              {u.email !== 'admin@visback.com' && (
+                                <button onClick={() => eliminarUsuario(u.email)} className="bg-red-100 text-red-600 hover:bg-red-200 px-3 py-1 rounded-lg text-xs font-bold cursor-pointer">Eliminar</button>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
             </div>
           )}
