@@ -402,6 +402,23 @@ export default function VisbackDashboard() {
     setTimeout(sincronizarConGoogleSheets, 1000);
   };
 
+  const eliminarReporte = async (idReporte: string) => {
+    if (confirm("¿Estás seguro de eliminar este reporte del historial?")) {
+      setReportesGlobales(prev => prev.filter(r => r.id !== idReporte));
+      try {
+        await fetch(GOOGLE_SHEET_URL, {
+          method: 'POST',
+          mode: 'no-cors',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'delete_reporte', id: idReporte })
+        });
+      } catch (err) {
+        console.error(err);
+      }
+      setTimeout(sincronizarConGoogleSheets, 1000);
+    }
+  };
+
   const agregarClienteAdmin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!adminNuevoNombre || !adminNuevoEmail || !adminNuevoPass) {
@@ -1168,12 +1185,12 @@ export default function VisbackDashboard() {
             </div>
           )}
 
-          {/* PESTAÑA EXCLUSIVA DE ADMIN: REPORTES DE CLIENTES */}
+          {/* PESTAÑA EXCLUSIVA DE ADMIN: REPORTES DE CLIENTES CON BOTÓN DE BORRAR */}
           {activeTab === 'admin_reportes' && usuarioActual?.rol === 'admin' && (
             <div className="space-y-6">
               <div className="bg-gradient-to-r from-amber-600 to-orange-700 rounded-3xl p-6 text-white shadow-xl">
                 <h3 className="text-2xl font-bold">Reportes de Cuentas de Clientes 🛠️</h3>
-                <p className="text-amber-100 text-sm mt-1">Revisa, responde y cambia el estatus de los reportes enviados por los usuarios.</p>
+                <p className="text-amber-100 text-sm mt-1">Revisa, responde, cambia el estatus o elimina reportes antiguos.</p>
               </div>
 
               <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-4">
@@ -1195,6 +1212,9 @@ export default function VisbackDashboard() {
                             <span className={`px-3 py-1 rounded-full text-xs font-bold ${rep.estado === 'Solucionado' ? 'bg-emerald-100 text-emerald-700' : rep.estado === 'Rechazado' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-800'}`}>
                               {rep.estado}
                             </span>
+                            <button onClick={() => eliminarReporte(rep.id)} className="bg-red-100 hover:bg-red-200 text-red-600 p-1.5 rounded-lg text-xs cursor-pointer" title="Eliminar reporte">
+                              <Trash2 size={16} />
+                            </button>
                           </div>
                         </div>
 
@@ -1377,7 +1397,7 @@ export default function VisbackDashboard() {
                 <p className="text-purple-200 text-sm mt-1">Ingresa los datos de la cuenta, indica si es Completa o Perfil, y detalla el problema.</p>
               </div>
 
-              {/* ENVIAR NUEVO REPORTE CON CORREO, CONTRASEÑA, TIPO Y DESCRIPCIÓN */}
+              {/* ENVIAR NUEVO REPORTE */}
               <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-4">
                 <h4 className="font-bold text-lg text-slate-800">Detalles del Reporte</h4>
                 <form onSubmit={enviarReporteCliente} className="space-y-4">
@@ -1430,7 +1450,7 @@ export default function VisbackDashboard() {
                 </form>
               </div>
 
-              {/* MIS REPORTES ENVIADOS */}
+              {/* MIS REPORTES ENVIADOS CON BOTÓN DE BORRAR */}
               <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-4">
                 <h4 className="font-bold text-lg text-slate-800">Historial de Mis Reportes</h4>
                 <div className="space-y-4">
@@ -1448,6 +1468,9 @@ export default function VisbackDashboard() {
                             <span className={`px-3 py-1 rounded-full text-xs font-bold ${rep.estado === 'Solucionado' ? 'bg-emerald-100 text-emerald-700' : rep.estado === 'Rechazado' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-800'}`}>
                               {rep.estado}
                             </span>
+                            <button onClick={() => eliminarReporte(rep.id)} className="bg-red-100 hover:bg-red-200 text-red-600 p-1.5 rounded-lg text-xs cursor-pointer" title="Borrar reporte del historial">
+                              <Trash2 size={16} />
+                            </button>
                           </div>
                         </div>
                         <div className="bg-white p-3 rounded-xl border font-mono text-xs text-slate-700 space-y-1">
