@@ -72,6 +72,7 @@ interface ReporteSoporte {
   cuenta_correo: string;
   cuenta_pass: string;
   tipo_cuenta: 'Completa' | 'Perfil';
+  num_perfil: string;
   mensaje: string;
   respuesta: string;
   estado: 'En proceso' | 'Solucionado' | 'Rechazado';
@@ -118,10 +119,14 @@ export default function VisbackDashboard() {
   const [transaccionesGlobales, setTransaccionesGlobales] = useState<TransaccionBilletera[]>([]);
   const [reportesGlobales, setReportesGlobales] = useState<ReporteSoporte[]>([]);
 
+  // IDs de reportes borrados por el cliente localmente (en su navegador)
+  const [reportesOcultosCliente, setReportesOcultosCliente] = useState<string[]>([]);
+
   // Campos para el reporte del cliente
   const [reporteCuentaCorreo, setReporteCuentaCorreo] = useState('');
   const [reporteCuentaPass, setReporteCuentaPass] = useState('');
   const [reporteTipoCuenta, setReporteTipoCuenta] = useState<'Completa' | 'Perfil'>('Completa');
+  const [reporteNumPerfil, setReporteNumPerfil] = useState('');
   const [reporteMensaje, setReporteMensaje] = useState('');
 
   // Respuestas del admin por ID
@@ -224,6 +229,7 @@ export default function VisbackDashboard() {
             cuenta_correo: String(r.cuenta_correo || ''),
             cuenta_pass: String(r.cuenta_pass || ''),
             tipo_cuenta: (String(r.tipo_cuenta || '').trim() === 'Perfil' ? 'Perfil' : 'Completa'),
+            num_perfil: String(r.num_perfil || 'N/A'),
             mensaje: String(r.mensaje || ''),
             respuesta: String(r.respuesta || ''),
             estado: (String(r.estado || '').trim() === 'Solucionado' ? 'Solucionado' : String(r.estado || '').trim() === 'Rechazado' ? 'Rechazado' : 'En proceso'),
@@ -271,6 +277,12 @@ export default function VisbackDashboard() {
           setUsuarioActual(parsedUser);
           setViewMode('app');
           setActiveTab(parsedUser.rol === 'admin' ? 'admin' : 'inicio');
+          
+          // Cargar reportes ocultos del cliente
+          const hiddenReports = localStorage.getItem(`visback_hidden_reports_${parsedUser.email}`);
+          if (hiddenReports) {
+            setReportesOcultosCliente(JSON.parse(hiddenReports));
+          }
         } catch (e) {
           console.error(e);
         }
@@ -314,6 +326,12 @@ export default function VisbackDashboard() {
 
     if (typeof window !== 'undefined') {
       localStorage.setItem('visback_usuario_actual', JSON.stringify(encontrado));
+      const hiddenReports = localStorage.getItem(`visback_hidden_reports_${encontrado.email}`);
+      if (hiddenReports) {
+        setReportesOcultosCliente(JSON.parse(hiddenReports));
+      } else {
+        setReportesOcultosCliente([]);
+      }
     }
   };
 
@@ -338,6 +356,11 @@ export default function VisbackDashboard() {
       return;
     }
 
+    if (reporteTipoCuenta === 'Perfil' && !reporteNumPerfil.trim()) {
+      alert("Has seleccionado Perfil, por favor indica el número o nombre del perfil.");
+      return;
+    }
+
     const fechaHoy = new Date().toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
     const nuevoReporte: ReporteSoporte = {
       id: `#R${Math.floor(100000 + Math.random() * 900000)}`,
@@ -345,6 +368,7 @@ export default function VisbackDashboard() {
       cuenta_correo: reporteCuentaCorreo.trim(),
       cuenta_pass: reporteCuentaPass.trim(),
       tipo_cuenta: reporteTipoCuenta,
+      num_perfil: reporteTipoCuenta === 'Perfil' ? reporteNumPerfil.trim() : 'N/A',
       mensaje: reporteMensaje.trim(),
       respuesta: '',
       estado: 'En proceso',
@@ -355,6 +379,7 @@ export default function VisbackDashboard() {
     setReporteCuentaCorreo('');
     setReporteCuentaPass('');
     setReporteTipoCuenta('Completa');
+    setReporteNumPerfil('');
     setReporteMensaje('');
 
     try {
@@ -402,15 +427,27 @@ export default function VisbackDashboard() {
     setTimeout(sincronizarConGoogleSheets, 1000);
   };
 
-  const eliminarReporte = async (idReporte: string) => {
-    if (confirm("¿Estás seguro de eliminar este reporte del historial?")) {
+  // Borrar reporte exclusivo para el cliente (solo lo oculta de su vista personal sin borrarlo del admin ni de la hoja)
+  const ocultarReporteCliente = (idReporte: string) => {
+    if (confirm("¿Eliminar este reporte de tu historial personal?")) {
+      const nuevosOcultos = [...reportesOcultosCliente, idReporte];
+      setReportesOcultosCliente(nuevosOcultos);
+      if (usuarioActual && typeof window !== 'undefined') {
+        localStorage.setItem(`visback_hidden_reports_${usuarioActual.email}`, JSON.stringify(nuevosOcultos));
+      }
+    }
+  };
+
+  // Borrar reporte definitivo por el administrador (lo borra de la hoja y de todas partes)
+  const eliminarReporteAdmin = async (idReporte: string) => {
+    if (confirm("¿Estás seguro de eliminar este reporte permanentemente de la base de datos?")) {
       setReportesGlobales(prev => prev.filter(r => r.id !== idReporte));
       try {
         await fetch(GOOGLE_SHEET_URL, {
           method: 'POST',
           mode: 'no-cors',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'delete_reporte', id: idReporte })
+          body: JSON.stringify({ action: 'delete_reporte_admin', id: idReporte })
         });
       } catch (err) {
         console.error(err);
@@ -812,7 +849,10 @@ export default function VisbackDashboard() {
 
   const misComprasFiltradas = comprasGlobales.filter(c => String(c.email).trim().toLowerCase() === String(usuarioActual?.email || '').trim().toLowerCase());
   const misTransaccionesFiltradas = transaccionesGlobales.filter(t => String(t.email).trim().toLowerCase() === String(usuarioActual?.email || '').trim().toLowerCase());
-  const misReportesFiltrados = reportesGlobales.filter(r => String(r.email).trim().toLowerCase() === String(usuarioActual?.email || '').trim().toLowerCase());
+  const misReportesFiltrados = reportesGlobales.filter(r => 
+    String(r.email).trim().toLowerCase() === String(usuarioActual?.email || '').trim().toLowerCase() && 
+    !reportesOcultosCliente.includes(r.id)
+  );
 
   // Auditoría ventas
   const ventasFiltradasBusqueda = comprasGlobales.filter(v => {
@@ -1185,12 +1225,12 @@ export default function VisbackDashboard() {
             </div>
           )}
 
-          {/* PESTAÑA EXCLUSIVA DE ADMIN: REPORTES DE CLIENTES CON BOTÓN DE BORRAR */}
+          {/* PESTAÑA EXCLUSIVA DE ADMIN: REPORTES DE CLIENTES */}
           {activeTab === 'admin_reportes' && usuarioActual?.rol === 'admin' && (
             <div className="space-y-6">
               <div className="bg-gradient-to-r from-amber-600 to-orange-700 rounded-3xl p-6 text-white shadow-xl">
                 <h3 className="text-2xl font-bold">Reportes de Cuentas de Clientes 🛠️</h3>
-                <p className="text-amber-100 text-sm mt-1">Revisa, responde, cambia el estatus o elimina reportes antiguos.</p>
+                <p className="text-amber-100 text-sm mt-1">Revisa, responde o elimina reportes de la base de datos.</p>
               </div>
 
               <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-4">
@@ -1207,12 +1247,12 @@ export default function VisbackDashboard() {
                           </div>
                           <div className="flex items-center gap-2">
                             <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-purple-100 text-purple-700 font-mono">
-                              {rep.tipo_cuenta}
+                              {rep.tipo_cuenta} {rep.tipo_cuenta === 'Perfil' && `(${rep.num_perfil})`}
                             </span>
                             <span className={`px-3 py-1 rounded-full text-xs font-bold ${rep.estado === 'Solucionado' ? 'bg-emerald-100 text-emerald-700' : rep.estado === 'Rechazado' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-800'}`}>
                               {rep.estado}
                             </span>
-                            <button onClick={() => eliminarReporte(rep.id)} className="bg-red-100 hover:bg-red-200 text-red-600 p-1.5 rounded-lg text-xs cursor-pointer" title="Eliminar reporte">
+                            <button onClick={() => eliminarReporteAdmin(rep.id)} className="bg-red-100 hover:bg-red-200 text-red-600 p-1.5 rounded-lg text-xs cursor-pointer" title="Eliminar definitivamente del sistema">
                               <Trash2 size={16} />
                             </button>
                           </div>
@@ -1394,14 +1434,14 @@ export default function VisbackDashboard() {
             <div className="space-y-6">
               <div className="bg-gradient-to-r from-purple-700 to-indigo-800 rounded-3xl p-6 text-white shadow-xl">
                 <h3 className="text-2xl font-bold">Reportar Cuenta con Falla 🛠️</h3>
-                <p className="text-purple-200 text-sm mt-1">Ingresa los datos de la cuenta, indica si es Completa o Perfil, y detalla el problema.</p>
+                <p className="text-purple-200 text-sm mt-1">Selecciona si es cuenta Completa o Perfil (si es perfil se habilitará el número) y detalla el problema.</p>
               </div>
 
-              {/* ENVIAR NUEVO REPORTE */}
+              {/* ENVIAR NUEVO REPORTE CON CONDICIONAL DE PERFIL */}
               <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-4">
                 <h4 className="font-bold text-lg text-slate-800">Detalles del Reporte</h4>
                 <form onSubmit={enviarReporteCliente} className="space-y-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                     <div className="space-y-1">
                       <label className="text-xs font-bold text-slate-600">Correo de la cuenta:</label>
                       <input 
@@ -1433,7 +1473,22 @@ export default function VisbackDashboard() {
                         <option value="Perfil">Perfil</option>
                       </select>
                     </div>
+
+                    {/* Campo condicional que solo se desbloquea si selecciona PERFIL */}
+                    {reporteTipoCuenta === 'Perfil' && (
+                      <div className="space-y-1 animate-fadeIn">
+                        <label className="text-xs font-bold text-purple-700">Número de Perfil:</label>
+                        <input 
+                          type="text" 
+                          placeholder="ej. Perfil 3" 
+                          value={reporteNumPerfil}
+                          onChange={e => setReporteNumPerfil(e.target.value)}
+                          className="w-full bg-purple-50/50 border border-purple-200 rounded-xl px-4 py-2.5 text-sm font-mono focus:outline-none focus:border-purple-500"
+                        />
+                      </div>
+                    )}
                   </div>
+
                   <div className="space-y-1">
                     <label className="text-xs font-bold text-slate-600">Explica el problema:</label>
                     <textarea 
@@ -1450,7 +1505,7 @@ export default function VisbackDashboard() {
                 </form>
               </div>
 
-              {/* MIS REPORTES ENVIADOS CON BOTÓN DE BORRAR */}
+              {/* MIS REPORTES ENVIADOS (CON BORRADO PERSONAL QUE NO AFECTA AL ADMIN) */}
               <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-4">
                 <h4 className="font-bold text-lg text-slate-800">Historial de Mis Reportes</h4>
                 <div className="space-y-4">
@@ -1463,12 +1518,12 @@ export default function VisbackDashboard() {
                           <span className="font-mono text-xs text-slate-400">{rep.id} - {rep.fecha}</span>
                           <div className="flex items-center gap-2">
                             <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-purple-100 text-purple-700 font-mono">
-                              {rep.tipo_cuenta}
+                              {rep.tipo_cuenta} {rep.tipo_cuenta === 'Perfil' && `(${rep.num_perfil})`}
                             </span>
                             <span className={`px-3 py-1 rounded-full text-xs font-bold ${rep.estado === 'Solucionado' ? 'bg-emerald-100 text-emerald-700' : rep.estado === 'Rechazado' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-800'}`}>
                               {rep.estado}
                             </span>
-                            <button onClick={() => eliminarReporte(rep.id)} className="bg-red-100 hover:bg-red-200 text-red-600 p-1.5 rounded-lg text-xs cursor-pointer" title="Borrar reporte del historial">
+                            <button onClick={() => ocultarReporteCliente(rep.id)} className="bg-red-100 hover:bg-red-200 text-red-600 p-1.5 rounded-lg text-xs cursor-pointer" title="Borrar de mi historial">
                               <Trash2 size={16} />
                             </button>
                           </div>
