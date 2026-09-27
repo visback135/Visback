@@ -17,7 +17,10 @@ import {
   Trash2,
   RefreshCw,
   UserPlus,
-  ShieldAlert
+  ShieldAlert,
+  Search,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 
 interface Producto {
@@ -85,6 +88,11 @@ export default function VisbackDashboard() {
   ]);
   const [inventarioCredenciales, setInventarioCredenciales] = useState<CredencialInventario[]>([]);
   const [comprasGlobales, setComprasGlobales] = useState<Compra[]>([]);
+
+  // Estados para Buscador y Paginación en Auditoría de Ventas
+  const [busquedaVentas, setBusquedaVentas] = useState('');
+  const [paginaActualVentas, setPaginaActualVentas] = useState(1);
+  const ventasPorPagina = 5; // Cantidad de filas a mostrar por página
 
   const [productoAConfirmar, setProductoAConfirmar] = useState<Producto | null>(null);
   const [compraExitosa, setCompraExitosa] = useState<Compra | null>(null);
@@ -602,6 +610,24 @@ export default function VisbackDashboard() {
 
   const misComprasFiltradas = comprasGlobales.filter(c => c.email === usuarioActual?.email.toLowerCase());
 
+  // Filtrar Auditoría de Ventas Globales con la Lupa
+  const ventasFiltradasBusqueda = comprasGlobales.filter(v => {
+    const query = busquedaVentas.toLowerCase();
+    return (
+      v.email.toLowerCase().includes(query) ||
+      v.producto.toLowerCase().includes(query) ||
+      v.correo.toLowerCase().includes(query) ||
+      v.pass.toLowerCase().includes(query) ||
+      v.vencimiento.toLowerCase().includes(query)
+    );
+  });
+
+  // Lógica de Paginación para Auditoría de Ventas
+  const totalPaginasVentas = Math.ceil(ventasFiltradasBusqueda.length / ventasPorPagina) || 1;
+  const indiceUltimoRegistro = paginaActualVentas * ventasPorPagina;
+  const indicePrimerRegistro = indiceUltimoRegistro - ventasPorPagina;
+  const ventasPaginadas = ventasFiltradasBusqueda.slice(indicePrimerRegistro, indiceUltimoRegistro);
+
   return (
     <div className="flex h-screen bg-slate-50 font-sans text-slate-800">
       {menuAbierto && <div onClick={() => setMenuAbierto(false)} className="fixed inset-0 bg-black/60 z-40 backdrop-blur-sm" />}
@@ -659,12 +685,29 @@ export default function VisbackDashboard() {
                 <p className="text-amber-100 text-sm mt-1">Control de catálogo, inventario, clientes y auditoría de ventas.</p>
               </div>
 
-              {/* AUDITORÍA GLOBAL DE VENTAS */}
+              {/* AUDITORÍA GLOBAL DE VENTAS CON BUSCADOR Y PAGINACIÓN TIPO PORNHUB */}
               <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-                <h4 className="font-bold text-lg text-slate-800 flex items-center gap-2">
-                  <ShieldAlert size={20} className="text-amber-600" /> Auditoría de Ventas Globales ({comprasGlobales.length})
-                </h4>
-                <div className="overflow-x-auto">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                  <h4 className="font-bold text-lg text-slate-800 flex items-center gap-2">
+                    <ShieldAlert size={20} className="text-amber-600" /> Auditoría de Ventas Globales ({comprasGlobales.length})
+                  </h4>
+                  
+                  {/* BARRA DE BÚSQUEDA (LUPA) */}
+                  <div className="relative w-full sm:w-72">
+                    <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-slate-400">
+                      <Search size={16} />
+                    </span>
+                    <input 
+                      type="text" 
+                      placeholder="Buscar cliente, servicio, cuenta..." 
+                      value={busquedaVentas}
+                      onChange={e => { setBusquedaVentas(e.target.value); setPaginaActualVentas(1); }}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-4 py-2 text-xs focus:outline-none focus:border-amber-500 font-medium"
+                    />
+                  </div>
+                </div>
+
+                <div className="overflow-x-auto min-h-[220px]">
                   <table className="w-full text-left text-sm">
                     <thead>
                       <tr className="bg-slate-50 text-slate-500 font-bold uppercase border-b text-xs">
@@ -676,18 +719,63 @@ export default function VisbackDashboard() {
                       </tr>
                     </thead>
                     <tbody className="divide-y">
-                      {comprasGlobales.map((venta, idx) => (
-                        <tr key={idx}>
-                          <td className="p-3 font-mono font-bold text-purple-600 text-xs">{venta.email}</td>
-                          <td className="p-3 font-semibold">{venta.producto}</td>
-                          <td className="p-3 font-mono text-xs">{venta.correo} / {venta.pass} {venta.pin !== 'N/A' && `(PIN: ${venta.pin})`}</td>
-                          <td className="p-3 font-mono text-xs text-slate-500">{venta.vencimiento}</td>
-                          <td className="p-3 font-bold text-emerald-600">${venta.precio.toFixed(2)}</td>
+                      {ventasPaginadas.length === 0 ? (
+                        <tr>
+                          <td colSpan={5} className="p-8 text-center text-slate-400 text-xs">No se encontraron registros coincidentes.</td>
                         </tr>
-                      ))}
+                      ) : (
+                        ventasPaginadas.map((venta, idx) => (
+                          <tr key={idx}>
+                            <td className="p-3 font-mono font-bold text-purple-600 text-xs">{venta.email}</td>
+                            <td className="p-3 font-semibold">{venta.producto}</td>
+                            <td className="p-3 font-mono text-xs">{venta.correo} / {venta.pass} {venta.pin !== 'N/A' && `(PIN: ${venta.pin})`}</td>
+                            <td className="p-3 font-mono text-xs text-slate-500">{venta.vencimiento}</td>
+                            <td className="p-3 font-bold text-emerald-600">${venta.precio.toFixed(2)}</td>
+                          </tr>
+                        ))
+                      )}
                     </tbody>
                   </table>
                 </div>
+
+                {/* BARRA DE PAGINACIÓN TIPO NAVEGACIÓN */}
+                {totalPaginasVentas > 1 && (
+                  <div className="flex items-center justify-between pt-4 border-t border-slate-100">
+                    <span className="text-xs text-slate-500 font-medium">
+                      Página <strong>{paginaActualVentas}</strong> de <strong>{totalPaginasVentas}</strong>
+                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <button 
+                        onClick={() => setPaginaActualVentas(prev => Math.max(prev - 1, 1))}
+                        disabled={paginaActualVentas === 1}
+                        className={`p-2 rounded-xl border text-xs font-bold flex items-center gap-1 transition-all ${paginaActualVentas === 1 ? 'bg-slate-100 text-slate-300 border-slate-200 cursor-not-allowed' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50 cursor-pointer'}`}
+                      >
+                        <ChevronLeft size={16} /> Anteriores
+                      </button>
+
+                      {/* NÚMEROS DE PÁGINA */}
+                      <div className="hidden sm:flex gap-1">
+                        {Array.from({ length: totalPaginasVentas }, (_, i) => i + 1).map(num => (
+                          <button
+                            key={num}
+                            onClick={() => setPaginaActualVentas(num)}
+                            className={`w-8 h-8 rounded-xl font-bold text-xs flex items-center justify-center cursor-pointer transition-all ${paginaActualVentas === num ? 'bg-amber-600 text-white shadow-md' : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'}`}
+                          >
+                            {num}
+                          </button>
+                        ))}
+                      </div>
+
+                      <button 
+                        onClick={() => setPaginaActualVentas(prev => Math.min(prev + 1, totalPaginasVentas))}
+                        disabled={paginaActualVentas === totalPaginasVentas}
+                        className={`p-2 rounded-xl border text-xs font-bold flex items-center gap-1 transition-all ${paginaActualVentas === totalPaginasVentas ? 'bg-slate-100 text-slate-300 border-slate-200 cursor-not-allowed' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50 cursor-pointer'}`}
+                      >
+                        Siguientes <ChevronRight size={16} />
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* REGISTRAR CLIENTE */}
