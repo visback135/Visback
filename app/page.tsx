@@ -87,6 +87,7 @@ export default function VisbackDashboard() {
 
   const [productoAConfirmar, setProductoAConfirmar] = useState<Producto | null>(null);
   const [compraExitosa, setCompraExitosa] = useState<Compra | null>(null);
+  const [procesandoCompra, setProcesandoCompra] = useState(false); // Blindaje anti doble clic
 
   const [nuevoProdId, setNuevoProdId] = useState('');
   const [nuevoProdNombre, setNuevoProdNombre] = useState('');
@@ -133,17 +134,29 @@ export default function VisbackDashboard() {
 
         if (data.usuarios && Array.isArray(data.usuarios)) {
           const formU: Usuario[] = data.usuarios.map((u: any) => ({
-            email: String(u.email || '').trim(),
+            email: String(u.email || '').trim().toLowerCase(),
             pass: String(u.pass || '').trim(),
             nombre: String(u.nombre || '').trim(),
             rol: (String(u.rol || '').trim() === 'admin' ? 'admin' : 'cliente'),
             estado: (String(u.estado || '').trim() === 'pendiente' ? 'pendiente' : 'activo'),
             saldo: Number(u.saldo) || 0
           }));
+          
           if (!formU.some(u => u.email === 'admin@visback.com')) {
             formU.unshift({ email: 'admin@visback.com', pass: 'admin123', nombre: 'Administrador', rol: 'admin', estado: 'activo', saldo: 500.00 });
           }
+          
           setUsuariosRegistrados(formU);
+
+          if (usuarioActual) {
+            const usuarioFresquito = formU.find(u => u.email === String(usuarioActual.email).trim().toLowerCase());
+            if (usuarioFresquito) {
+              setUsuarioActual(usuarioFresquito);
+              if (typeof window !== 'undefined') {
+                localStorage.setItem('visback_usuario_actual', JSON.stringify(usuarioFresquito));
+              }
+            }
+          }
         }
       })
       .catch((err: any) => console.error("Error al sincronizar:", err));
@@ -183,17 +196,18 @@ export default function VisbackDashboard() {
 
   const handleLogin = (e?: React.SyntheticEvent) => {
     if (e) e.preventDefault();
-    const emailVal = loginEmailRef.current?.value.trim() || '';
+    const emailVal = loginEmailRef.current?.value.trim().toLowerCase() || '';
     const passVal = loginPasswordRef.current?.value.trim() || '';
 
     const encontrado = usuariosRegistrados.find(
-      u => u.email.toLowerCase() === emailVal.toLowerCase() && u.pass === passVal
+      u => u.email.toLowerCase() === emailVal && u.pass === passVal
     ) || (emailVal === 'admin@visback.com' && passVal === 'admin123' ? { email: 'admin@visback.com', pass: 'admin123', nombre: 'Administrador', rol: 'admin', estado: 'activo', saldo: 500 } : null);
 
     if (!encontrado) {
       alert(`Acceso denegado. Correo o contraseña incorrectos.`);
       return;
     }
+
     setUsuarioActual(encontrado as Usuario);
     setViewMode('app');
     setActiveTab(encontrado.rol === 'admin' ? 'admin' : 'inicio');
@@ -223,15 +237,18 @@ export default function VisbackDashboard() {
       alert("Completa todos los campos del cliente.");
       return;
     }
+    
     const nuevoCliente: Usuario = {
-      email: adminNuevoEmail,
+      email: String(adminNuevoEmail).trim().toLowerCase(),
       pass: adminNuevoPass,
       nombre: adminNuevoNombre,
       rol: 'cliente',
       estado: adminNuevoEstado,
       saldo: 0.00
     };
+
     setUsuariosRegistrados(prev => [...prev, nuevoCliente]);
+
     try {
       await fetch(GOOGLE_SHEET_URL, {
         method: 'POST',
@@ -239,7 +256,10 @@ export default function VisbackDashboard() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'add_usuario', ...nuevoCliente })
       });
-    } catch (err) { console.error(err); }
+    } catch (err) { 
+      console.error("Error al registrar cliente:", err); 
+    }
+
     setAdminNuevoNombre('');
     setAdminNuevoEmail('');
     setAdminNuevoPass('');
@@ -272,32 +292,45 @@ export default function VisbackDashboard() {
       alert("Ingresa una cantidad válida de saldo.");
       return;
     }
+
     let saldoFinalCalculado = 0;
+    const emailBuscado = String(email).trim().toLowerCase();
+
     const usuariosActualizados = usuariosRegistrados.map(u => {
-      if (u.email === email) {
+      if (String(u.email).trim().toLowerCase() === emailBuscado) {
         let nuevoSaldo = tipo === 'agregar' ? u.saldo + monto : u.saldo - monto;
         if (nuevoSaldo < 0) nuevoSaldo = 0;
         saldoFinalCalculado = nuevoSaldo;
-        if (usuarioActual?.email === email) {
-          const actualizado = { ...u, saldo: nuevoSaldo };
-          setUsuarioActual(actualizado);
-          localStorage.setItem('visback_usuario_actual', JSON.stringify(actualizado));
+
+        if (usuarioActual && String(usuarioActual.email).trim().toLowerCase() === emailBuscado) {
+          const sesionActualizada = { ...u, saldo: nuevoSaldo };
+          setUsuarioActual(sesionActualizada);
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('visback_usuario_actual', JSON.stringify(sesionActualizada));
+          }
         }
+
         return { ...u, saldo: nuevoSaldo };
       }
       return u;
     });
+
     setUsuariosRegistrados(usuariosActualizados);
+
     try {
       await fetch(GOOGLE_SHEET_URL, {
         method: 'POST',
         mode: 'no-cors',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'update_saldo', email, saldo: saldoFinalCalculado })
+        body: JSON.stringify({ action: 'update_saldo', email: emailBuscado, saldo: saldoFinalCalculado })
       });
-    } catch (err) { console.error(err); }
+    } catch (err) { 
+      console.error("Error al actualizar saldo en Sheets:", err); 
+    }
+
     setCantidadesRecarga(prev => ({ ...prev, [email]: '' }));
-    alert("¡Saldo actualizado con éxito!");
+    alert(`¡Saldo actualizado correctamente a $${saldoFinalCalculado.toFixed(2)} MXN!`);
+    setTimeout(sincronizarConGoogleSheets, 800);
   };
 
   const agregarProductoAdmin = async (e: React.FormEvent) => {
@@ -434,23 +467,43 @@ export default function VisbackDashboard() {
     }
   };
 
+  // FUNCIÓN DE COMPRA BLINDADA CONTRA DOBLE CLIC (RACE CONDITION)
   const ejecutarCompraFinal = async () => {
     if (!productoAConfirmar || !usuarioActual) return;
+    
+    if (procesandoCompra) return; // Bloquear si ya hay un proceso en marcha
+
     if (usuarioActual.saldo < productoAConfirmar.precio) {
       alert("Saldo insuficiente.");
-      return;
-    }
-    const credencialDisponible = inventarioCredenciales.find(
-      c => String(c.productoId).trim().toLowerCase() === String(productoAConfirmar.id).trim().toLowerCase() && String(c.estado).trim().toLowerCase() === 'disponible'
-    );
-    if (!credencialDisponible) {
-      alert("Sin stock disponible.");
       setProductoAConfirmar(null);
       return;
     }
+
+    setProcesandoCompra(true);
+
+    const credencialDisponible = inventarioCredenciales.find(
+      c => String(c.productoId).trim().toLowerCase() === String(productoAConfirmar.id).trim().toLowerCase() && String(c.estado).trim().toLowerCase() === 'disponible'
+    );
+
+    if (!credencialDisponible) {
+      alert("Lo sentimos, el stock se agotó hace un momento.");
+      setProductoAConfirmar(null);
+      setProcesandoCompra(false);
+      return;
+    }
+
+    // Marcar de inmediato como vendida localmente para bloquear doble entrega
     setInventarioCredenciales(prev => prev.map(c => 
       c.id === credencialDisponible.id ? { ...c, estado: 'vendida' } : c
     ));
+
+    const nuevoSaldo = usuarioActual.saldo - productoAConfirmar.precio;
+    const actualizado = { ...usuarioActual, saldo: nuevoSaldo };
+    setUsuarioActual(actualizado);
+    localStorage.setItem('visback_usuario_actual', JSON.stringify(actualizado));
+
+    setUsuariosRegistrados(prev => prev.map(u => u.email.toLowerCase() === usuarioActual.email.toLowerCase() ? { ...u, saldo: nuevoSaldo } : u));
+
     try {
       await fetch(GOOGLE_SHEET_URL, {
         method: 'POST',
@@ -458,21 +511,16 @@ export default function VisbackDashboard() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'vender_credencial', id: credencialDisponible.id })
       });
-    } catch (err) { console.error(err); }
 
-    const nuevoSaldo = usuarioActual.saldo - productoAConfirmar.precio;
-    const actualizado = { ...usuarioActual, saldo: nuevoSaldo };
-    setUsuarioActual(actualizado);
-    localStorage.setItem('visback_usuario_actual', JSON.stringify(actualizado));
-    setUsuariosRegistrados(prev => prev.map(u => u.email === usuarioActual.email ? { ...u, saldo: nuevoSaldo } : u));
-    try {
       await fetch(GOOGLE_SHEET_URL, {
         method: 'POST',
         mode: 'no-cors',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'update_saldo', email: usuarioActual.email, saldo: nuevoSaldo })
       });
-    } catch (err) { console.error(err); }
+    } catch (err) { 
+      console.error("Error en transacción:", err); 
+    }
 
     const nuevaCompra: Compra = {
       id: `#${Math.floor(100000 + Math.random() * 900000)}`,
@@ -484,9 +532,13 @@ export default function VisbackDashboard() {
       vencimiento: '24/10/2026',
       estado: 'Activa'
     };
+
     setCompras(prev => [nuevaCompra, ...prev]);
     setProductoAConfirmar(null);
+    setProcesandoCompra(false);
     setCompraExitosa(nuevaCompra);
+
+    setTimeout(sincronizarConGoogleSheets, 1000);
   };
 
   if (viewMode === 'login') {
@@ -859,8 +911,20 @@ export default function VisbackDashboard() {
             <h3 className="text-lg font-extrabold">Confirmar Compra</h3>
             <p className="text-sm">¿Deseas comprar <strong>{productoAConfirmar.nombre}</strong> por ${productoAConfirmar.precio.toFixed(2)} MXN?</p>
             <div className="flex gap-3 pt-2">
-              <button onClick={() => setProductoAConfirmar(null)} className="flex-1 bg-slate-200 hover:bg-slate-300 py-2.5 rounded-xl font-bold text-sm cursor-pointer">No</button>
-              <button onClick={ejecutarCompraFinal} className="flex-1 bg-purple-600 hover:bg-purple-700 text-white py-2.5 rounded-xl font-bold text-sm cursor-pointer shadow-md">Sí</button>
+              <button 
+                onClick={() => setProductoAConfirmar(null)} 
+                disabled={procesandoCompra}
+                className="flex-1 bg-slate-200 hover:bg-slate-300 py-2.5 rounded-xl font-bold text-sm cursor-pointer"
+              >
+                No
+              </button>
+              <button 
+                onClick={ejecutarCompraFinal} 
+                disabled={procesandoCompra}
+                className={`flex-1 py-2.5 rounded-xl font-bold text-sm text-white shadow-md transition-all ${procesandoCompra ? 'bg-purple-400 cursor-wait' : 'bg-purple-600 hover:bg-purple-700 cursor-pointer'}`}
+              >
+                {procesandoCompra ? 'Procesando...' : 'Sí'}
+              </button>
             </div>
           </div>
         </div>
